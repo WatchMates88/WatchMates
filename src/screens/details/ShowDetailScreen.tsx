@@ -199,22 +199,35 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.sectionTitle}>Overview</Text>
         <Text style={styles.overview}>{show.overview}</Text>
 
+        {/* Action Buttons - Three buttons */}
         <View style={styles.actions}>
           <View style={styles.buttonRow}>
-            <View style={styles.buttonHalf}>
+            <View style={styles.buttonThird}>
               <Button 
-                title={isInWatchlist ? '✓ In List' : '+ Watchlist'}
+                title={isInWatchlist ? '✓ List' : '+ List'}
                 onPress={handleAddToWatchlist}
                 loading={addingToWatchlist}
                 variant={isInWatchlist ? 'secondary' : 'primary'}
               />
             </View>
-            <View style={styles.buttonHalf}>
+            <View style={styles.buttonThird}>
               <Button 
-                title={isWatched ? '✓ Watched' : 'Mark Watched'}
+                title={isWatched ? '✓ Seen' : 'Watched'}
                 onPress={handleMarkWatched}
                 loading={markingWatched}
                 variant={isWatched ? 'secondary' : 'outline'}
+              />
+            </View>
+            <View style={styles.buttonThird}>
+              <Button 
+                title="Review"
+                onPress={() => navigation.navigate('CreatePost', {
+                  movieId: showId,
+                  mediaType: 'tv',
+                  title: show.name,
+                  poster: show.poster_path,
+                })}
+                variant="outline"
               />
             </View>
           </View>
@@ -345,9 +358,9 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  buttonHalf: {
+  buttonThird: {
     flex: 1,
   },
   errorContainer: {

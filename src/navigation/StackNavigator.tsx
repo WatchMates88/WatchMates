@@ -1,3 +1,4 @@
+import { SettingsScreen } from '../screens/profile/SettingsScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -7,8 +8,9 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { SignupScreen } from '../screens/auth/SignupScreen';
 import { MovieDetailScreen } from '../screens/details/MovieDetailScreen';
 import { ShowDetailScreen } from '../screens/details/ShowDetailScreen';
-import { SearchUsersScreen } from '../screens/friends/SearchUsersScreen';
 import { FriendProfileScreen } from '../screens/friends/FriendProfileScreen';
+import { SearchUsersScreen } from '../screens/friends/SearchUsersScreen';
+import { CreatePostScreen } from '../screens/feed/CreatePostScreen';
 import { colors } from '../theme';
 import { useAuthStore } from '../store';
 
@@ -69,17 +71,30 @@ export const StackNavigator = () => {
             options={{ title: 'Show Details' }}
           />
           <Stack.Screen
-            name="SearchUsers"
-            component={SearchUsersScreen}
-            options={{ title: 'Find Friends' }}
-          />
-          <Stack.Screen
             name="FriendProfile"
             component={FriendProfileScreen}
             options={{ title: 'Profile' }}
+          />
+          <Stack.Screen
+            name="SearchUsers"
+            component={SearchUsersScreen as any}
+            options={{ title: 'Find Friends' }}
+          />
+          <Stack.Screen
+            name="CreatePost"
+            component={CreatePostScreen}
+            options={{ 
+              title: 'Write Review',
+              presentation: 'modal',
+            }}
           />
         </>
       )}
     </Stack.Navigator>
   );
 };
+<Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ title: 'Settings' }}
+          />

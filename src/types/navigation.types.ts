@@ -7,14 +7,16 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<TabParamList>;
   MovieDetail: { movieId: number };
   ShowDetail: { showId: number };
-  SearchUsers: undefined;
   FriendProfile: { userId: string };
+  SearchUsers: undefined;
+  CreatePost: { movieId: number; mediaType: 'movie' | 'tv'; title: string; poster: string | null };
+  Settings: undefined;
 };
 
 export type TabParamList = {
   Home: undefined;
   Search: undefined;
+  Feed: undefined;
   Watchlist: undefined;
-  Friends: undefined;
   Profile: undefined;
-};  
+};

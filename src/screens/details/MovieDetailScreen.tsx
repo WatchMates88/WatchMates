@@ -91,19 +91,16 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setMarkingWatched(true);
       
       if (watchlistItem?.status === 'watched') {
-        // Already watched, update to to_watch
         await watchlistService.updateStatus(watchlistItem.id, 'to_watch');
         const updated = { ...watchlistItem, status: 'to_watch', watched_at: null };
         setWatchlistItem(updated);
         Alert.alert('Success', 'Moved to "To Watch"');
       } else if (watchlistItem) {
-        // In watchlist but not watched, mark as watched
         await watchlistService.updateStatus(watchlistItem.id, 'watched');
         const updated = { ...watchlistItem, status: 'watched', watched_at: new Date().toISOString() };
         setWatchlistItem(updated);
         Alert.alert('Success', 'Marked as watched!');
       } else {
-        // Not in watchlist, add as watched
         const item = await watchlistService.addToWatchlist(user.id, movieId, 'movie', 'watched');
         setWatchlistItem(item);
         Alert.alert('Success', 'Marked as watched!');
@@ -202,30 +199,42 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Where to Watch - Enhanced with clickable icons */}
+        {/* Where to Watch */}
         <WatchProviders providers={providers} mediaType="movie" tmdbId={movieId} />
 
         {/* Overview */}
         <Text style={styles.sectionTitle}>Overview</Text>
         <Text style={styles.overview}>{movie.overview}</Text>
 
-        {/* Action Buttons - Two buttons side by side */}
+        {/* Action Buttons - Three buttons */}
         <View style={styles.actions}>
           <View style={styles.buttonRow}>
-            <View style={styles.buttonHalf}>
+            <View style={styles.buttonThird}>
               <Button 
-                title={isInWatchlist ? '✓ In List' : '+ Watchlist'}
+                title={isInWatchlist ? '✓ List' : '+ List'}
                 onPress={handleAddToWatchlist}
                 loading={addingToWatchlist}
                 variant={isInWatchlist ? 'secondary' : 'primary'}
               />
             </View>
-            <View style={styles.buttonHalf}>
+            <View style={styles.buttonThird}>
               <Button 
-                title={isWatched ? '✓ Watched' : 'Mark Watched'}
+                title={isWatched ? '✓ Seen' : 'Watched'}
                 onPress={handleMarkWatched}
                 loading={markingWatched}
                 variant={isWatched ? 'secondary' : 'outline'}
+              />
+            </View>
+            <View style={styles.buttonThird}>
+              <Button 
+                title="Review"
+                onPress={() => navigation.navigate('CreatePost', {
+                  movieId,
+                  mediaType: 'movie',
+                  title: movie.title,
+                  poster: movie.poster_path,
+                })}
+                variant="outline"
               />
             </View>
           </View>
@@ -358,9 +367,9 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  buttonHalf: {
+  buttonThird: {
     flex: 1,
   },
   errorContainer: {
