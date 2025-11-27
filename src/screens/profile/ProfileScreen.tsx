@@ -49,6 +49,8 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleUserPress = (profile: Profile) => {
+    setFriendsView('none');
+    setSearchQuery('');
     navigation?.navigate('FriendProfile', { userId: profile.id });
   };
 
@@ -160,11 +162,11 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <View style={styles.listHeader}>
-          <TouchableOpacity onPress={() => setFriendsView('none')} style={styles.backButton}>
+          <TouchableOpacity onPress={() => { setFriendsView('none'); setSearchQuery(''); }} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.listTitle}>{title}</Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.searchContainer}>
@@ -231,7 +233,6 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           )}
 
-          {/* Friends Stats - 3 columns clickable */}
           <View style={styles.followStatsCard}>
             <TouchableOpacity 
               style={styles.followStat}
@@ -300,14 +301,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    position: 'absolute',
-    top: 16,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    zIndex: 10,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+    zIndex: 100,
   },
   headerButton: {
     width: 44,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: 80,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
   },
   avatarWrapper: {
@@ -521,7 +521,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.textSecondary,
   },
-  // Friends List View Styles
   listHeader: {
     flexDirection: 'row',
     alignItems: 'center',

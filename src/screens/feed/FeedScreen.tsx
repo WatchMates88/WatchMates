@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Container } from '../../components/layout/Container';
 import { UserAvatar } from '../../components/user/UserAvatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { colors, spacing, typography } from '../../theme';
@@ -40,9 +39,12 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     await toggleLike(postId, user.id);
   };
 
+  const handleComment = (postId: string) => {
+    Alert.alert('Coming Soon', 'Comments feature coming soon!');
+  };
+
   const handleUserPress = (userId: string) => {
     if (userId === user?.id) {
-      // Navigate to own profile tab
       navigation.navigate('Profile');
     } else {
       navigation.navigate('FriendProfile', { userId });
@@ -58,8 +60,10 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleCreatePost = () => {
-    // TODO: Navigate to create post or show modal
-    console.log('Create post');
+    Alert.alert(
+      'Create Post',
+      'Please go to a movie or show detail page and click the "Review" button to create a post!'
+    );
   };
 
   const formatTimeAgo = (dateString: string): string => {
@@ -85,7 +89,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
         <UserAvatar
           avatarUrl={item.profile?.avatar_url}
           username={item.profile?.username || 'User'}
-          size={40}
+          size={44}
         />
         <View style={styles.postHeaderText}>
           <Text style={styles.postUsername}>
@@ -93,26 +97,30 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
           <Text style={styles.postTime}>{formatTimeAgo(item.created_at)}</Text>
         </View>
+        <TouchableOpacity style={styles.moreButton}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
       </TouchableOpacity>
 
       {/* Review Text */}
       <Text style={styles.reviewText}>{item.review_text}</Text>
 
-      {/* Rating */}
+      {/* Rating Stars */}
       {item.rating && (
         <View style={styles.ratingContainer}>
           {[1, 2, 3, 4, 5].map((star) => (
             <Ionicons
               key={star}
               name={star <= item.rating! ? 'star' : 'star-outline'}
-              size={16}
+              size={18}
               color="#FFD700"
             />
           ))}
+          <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
         </View>
       )}
 
-      {/* Movie/Show Card */}
+      {/* Movie/Show Card with Poster */}
       <TouchableOpacity
         style={styles.mediaCard}
         onPress={() => handleMediaPress(item)}
@@ -120,24 +128,36 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
       >
         {item.media_poster ? (
           <Image
-            source={{ uri: `https://image.tmdb.org/t/p/w185${item.media_poster}` }}
+            source={{ uri: `https://image.tmdb.org/t/p/w342${item.media_poster}` }}
             style={styles.mediaPoster}
           />
         ) : (
-          <View style={styles.mediaPosterPlaceholder} />
+          <View style={styles.mediaPosterPlaceholder}>
+            <Ionicons name="film-outline" size={32} color={colors.textTertiary} />
+          </View>
         )}
         <View style={styles.mediaInfo}>
+          <View style={styles.mediaTypeTag}>
+            <Ionicons 
+              name={item.media_type === 'movie' ? 'film-outline' : 'tv-outline'} 
+              size={12} 
+              color={colors.primary} 
+            />
+            <Text style={styles.mediaTypeText}>
+              {item.media_type === 'movie' ? 'MOVIE' : 'TV SHOW'}
+            </Text>
+          </View>
           <Text style={styles.mediaTitle} numberOfLines={2}>
             {item.media_title}
           </Text>
-          <Text style={styles.mediaType}>
-            {item.media_type === 'movie' ? 'Movie' : 'TV Show'}
-          </Text>
+          <View style={styles.viewDetailsButton}>
+            <Text style={styles.viewDetailsText}>View Details</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
+          </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
       </TouchableOpacity>
 
-      {/* Actions */}
+      {/* Action Buttons */}
       <View style={styles.postActions}>
         <TouchableOpacity
           style={styles.actionButton}
@@ -146,10 +166,28 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
         >
           <Ionicons
             name={item.is_liked ? 'heart' : 'heart-outline'}
-            size={20}
+            size={22}
             color={item.is_liked ? '#FF6B6B' : colors.textSecondary}
           />
-          <Text style={styles.actionText}>{item.like_count || 0}</Text>
+          <Text style={[styles.actionText, item.is_liked && styles.actionTextLiked]}>
+            {item.like_count || 0}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => handleComment(item.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
+          <Text style={styles.actionText}>0</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -157,11 +195,11 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
 
   if (!user) {
     return (
-      <Container>
+      <View style={styles.container}>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Please login to view feed</Text>
         </View>
-      </Container>
+      </View>
     );
   }
 
@@ -189,8 +227,15 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.emptyFeedEmoji}>🎬</Text>
             <Text style={styles.emptyFeedText}>No posts yet</Text>
             <Text style={styles.emptyFeedSubtext}>
-              Follow friends to see their reviews!
+              Follow friends to see their reviews, or create your first post!
             </Text>
+            <TouchableOpacity 
+              style={styles.emptyFeedButton}
+              onPress={handleCreatePost}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyFeedButtonText}>Create Your First Review</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -214,19 +259,20 @@ const styles = StyleSheet.create({
   },
   feedList: {
     padding: spacing.md,
+    paddingBottom: 100,
   },
   postCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   postHeader: {
     flexDirection: 'row',
@@ -238,7 +284,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postUsername: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text,
   },
@@ -246,6 +292,9 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  moreButton: {
+    padding: spacing.xs,
   },
   reviewText: {
     fontSize: typography.fontSize.md,
@@ -255,46 +304,81 @@ const styles = StyleSheet.create({
   },
   ratingContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     marginBottom: spacing.md,
   },
+  ratingText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: '#FFD700',
+    marginLeft: spacing.xs,
+  },
   mediaCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 16,
     padding: spacing.sm,
     marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   mediaPoster: {
-    width: 48,
-    height: 72,
-    borderRadius: 8,
+    width: 80,
+    height: 120,
+    borderRadius: 12,
     backgroundColor: colors.backgroundTertiary,
   },
   mediaPosterPlaceholder: {
-    width: 48,
-    height: 72,
-    borderRadius: 8,
+    width: 80,
+    height: 120,
+    borderRadius: 12,
     backgroundColor: colors.backgroundTertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mediaInfo: {
     flex: 1,
     marginLeft: spacing.md,
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+  },
+  mediaTypeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '15',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  mediaTypeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.5,
   },
   mediaTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text,
+    marginTop: spacing.xs,
   },
-  mediaType: {
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.xs,
+  },
+  viewDetailsText: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
-    marginTop: 2,
+    fontWeight: '600',
+    color: colors.primary,
   },
   postActions: {
     flexDirection: 'row',
     gap: spacing.lg,
+    paddingTop: spacing.sm,
   },
   actionButton: {
     flexDirection: 'row',
@@ -306,13 +390,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: typography.fontWeight.medium,
   },
+  actionTextLiked: {
+    color: '#FF6B6B',
+  },
   fab: {
     position: 'absolute',
     bottom: 24,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -333,21 +420,41 @@ const styles = StyleSheet.create({
   },
   emptyFeed: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 100,
+    paddingHorizontal: spacing.xl,
   },
   emptyFeedEmoji: {
     fontSize: 64,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   emptyFeedText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptyFeedSubtext: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.xl,
+  },
+  emptyFeedButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  emptyFeedButtonText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
   },
 });

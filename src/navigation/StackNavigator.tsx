@@ -1,4 +1,3 @@
-import { SettingsScreen } from '../screens/profile/SettingsScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -11,6 +10,9 @@ import { ShowDetailScreen } from '../screens/details/ShowDetailScreen';
 import { FriendProfileScreen } from '../screens/friends/FriendProfileScreen';
 import { SearchUsersScreen } from '../screens/friends/SearchUsersScreen';
 import { CreatePostScreen } from '../screens/feed/CreatePostScreen';
+import { SettingsScreen } from '../screens/profile/SettingsScreen';
+import { CollectionsScreen } from '../screens/watchlist/CollectionsScreen';
+import { CollectionDetailScreen } from '../screens/watchlist/CollectionDetailScreen';
 import { colors } from '../theme';
 import { useAuthStore } from '../store';
 
@@ -88,13 +90,23 @@ export const StackNavigator = () => {
               presentation: 'modal',
             }}
           />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ title: 'Settings' }}
+          />
+          <Stack.Screen
+            name="Collections"
+            component={CollectionsScreen}
+            options={{ title: 'Collections' }}
+          />
+          <Stack.Screen
+            name="CollectionDetail"
+            component={CollectionDetailScreen}
+            options={{ title: 'Collection' }}
+          />
         </>
       )}
     </Stack.Navigator>
   );
 };
-<Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{ title: 'Settings' }}
-          />

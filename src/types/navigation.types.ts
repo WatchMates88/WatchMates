@@ -11,6 +11,8 @@ export type RootStackParamList = {
   SearchUsers: undefined;
   CreatePost: { movieId: number; mediaType: 'movie' | 'tv'; title: string; poster: string | null };
   Settings: undefined;
+  Collections: undefined;
+  CollectionDetail: { collectionId: string };
 };
 
 export type TabParamList = {
