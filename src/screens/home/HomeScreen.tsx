@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList, Movie, TVShow } from '../../types';
+import { View, StyleSheet } from 'react-native';
+import { Movie, TVShow } from '../../types';
 import { Container } from '../../components/layout/Container';
 import { SectionHeader } from '../../components/layout/SectionHeader';
 import { PosterGrid } from '../../components/media/PosterGrid';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { colors, spacing, typography } from '../../theme';
+import { SegmentedControl } from '../../components/common/SegmentedControl';
+import { spacing } from '../../theme';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'MainTabs'>;
+type Props = {
+  navigation: any;
+};
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState<'movies' | 'tv'>('movies');
@@ -40,10 +42,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleItemPress = (item: Movie | TVShow) => {
     if ('title' in item) {
-      // @ts-ignore
       navigation.navigate('MovieDetail', { movieId: item.id });
     } else {
-      // @ts-ignore
       navigation.navigate('ShowDetail', { showId: item.id });
     }
   };
@@ -61,23 +61,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         onItemPress={handleItemPress}
         ListHeaderComponent={
           <View>
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tab, selectedTab === 'movies' && styles.activeTab]}
-                onPress={() => setSelectedTab('movies')}
-              >
-                <Text style={[styles.tabText, selectedTab === 'movies' && styles.activeTabText]}>
-                  Movies
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, selectedTab === 'tv' && styles.activeTab]}
-                onPress={() => setSelectedTab('tv')}
-              >
-                <Text style={[styles.tabText, selectedTab === 'tv' && styles.activeTabText]}>
-                  TV Shows
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.toggleWrapper}>
+              <SegmentedControl
+                segments={['Movies', 'TV Shows']}
+                selectedIndex={selectedTab === 'movies' ? 0 : 1}
+                onChange={(index) => setSelectedTab(index === 0 ? 'movies' : 'tv')}
+              />
             </View>
             <SectionHeader title="Trending" />
           </View>
@@ -91,30 +80,8 @@ const styles = StyleSheet.create({
   container: {
     padding: 0,
   },
-  tabContainer: {
-    flexDirection: 'row',
+  toggleWrapper: {
+    paddingHorizontal: spacing.md,
     marginTop: spacing.md,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 8,
-    padding: spacing.xs,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: colors.primary,
-  },
-  tabText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-  },
-  activeTabText: {
-    color: colors.background,
   },
 });

@@ -102,6 +102,45 @@ class TMDBService {
     return data.genres;
   }
 
+  // Cast & Crew - NEW METHODS
+  async getMovieCredits(movieId: number): Promise<any> {
+    return this.fetch(`/movie/${movieId}/credits`);
+  }
+
+  async getTVCredits(showId: number): Promise<any> {
+    return this.fetch(`/tv/${showId}/credits`);
+  }
+
+  // Similar & Recommendations - NEW METHODS
+  async getSimilarMovies(movieId: number): Promise<TMDBMovie[]> {
+    const data = await this.fetch<TMDBResponse<TMDBMovie>>(`/movie/${movieId}/similar`);
+    return data.results;
+  }
+
+  async getRecommendedMovies(movieId: number): Promise<TMDBMovie[]> {
+    const data = await this.fetch<TMDBResponse<TMDBMovie>>(`/movie/${movieId}/recommendations`);
+    return data.results;
+  }
+
+  async getSimilarTVShows(showId: number): Promise<TMDBTVShow[]> {
+    const data = await this.fetch<TMDBResponse<TMDBTVShow>>(`/tv/${showId}/similar`);
+    return data.results;
+  }
+
+  async getRecommendedTVShows(showId: number): Promise<TMDBTVShow[]> {
+    const data = await this.fetch<TMDBResponse<TMDBTVShow>>(`/tv/${showId}/recommendations`);
+    return data.results;
+  }
+
+  // Watch Providers - NEW METHODS
+  async getMovieWatchProviders(movieId: number): Promise<any> {
+    return this.fetch(`/movie/${movieId}/watch/providers`);
+  }
+
+  async getTVWatchProviders(showId: number): Promise<any> {
+    return this.fetch(`/tv/${showId}/watch/providers`);
+  }
+
   // Helper to get image URL
   getImageUrl(path: string | null, size: string = 'w500'): string | null {
     if (!path) return null;

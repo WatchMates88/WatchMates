@@ -1,0 +1,83 @@
+.
+├── App.tsx
+├── app.json
+├── assets
+│   ├── adaptive-icon.png
+│   ├── favicon.png
+│   ├── icon.png
+│   └── splash-icon.png
+├── index.ts
+├── package-lock.json
+├── package.json
+├── src
+│   ├── components
+│   │   ├── common
+│   │   │   ├── Button.tsx
+│   │   │   ├── ErrorMessage.tsx
+│   │   │   └── LoadingSpinner.tsx
+│   │   ├── layout
+│   │   │   ├── Container.tsx
+│   │   │   └── SectionHeader.tsx
+│   │   ├── media
+│   │   │   ├── PosterCard.tsx
+│   │   │   └── PosterGrid.tsx
+│   │   ├── search
+│   │   │   ├── GenreBlock.tsx
+│   │   │   └── SearchBar.tsx
+│   │   └── user
+│   │       ├── FollowButton.tsx
+│   │       └── UserAvatar.tsx
+│   ├── hooks
+│   ├── lib
+│   ├── navigation
+│   │   ├── StackNavigator.tsx
+│   │   ├── TabNavigator.tsx
+│   │   └── index.tsx
+│   ├── screens
+│   │   ├── details
+│   │   │   ├── MovieDetailScreen.tsx
+│   │   │   └── ShowDetailScreen.tsx
+│   │   ├── friends
+│   │   │   └── FriendsScreen.tsx
+│   │   ├── home
+│   │   │   └── HomeScreen.tsx
+│   │   ├── profile
+│   │   │   └── ProfileScreen.tsx
+│   │   ├── search
+│   │   │   └── SearchScreen.tsx
+│   │   └── watchlist
+│   │       └── WatchlistScreen.tsx
+│   ├── services
+│   │   ├── supabase
+│   │   │   ├── auth.service.ts
+│   │   │   ├── friends.service.ts
+│   │   │   ├── ratings.service.ts
+│   │   │   ├── supabase.client.ts
+│   │   │   └── watchlist.service.ts
+│   │   └── tmdb
+│   │       ├── tmdb.service.ts
+│   │       └── tmdb.types.ts
+│   ├── store
+│   │   ├── authStore.ts
+│   │   ├── friendsStore.ts
+│   │   ├── index.ts
+│   │   ├── mediaStore.ts
+│   │   └── watchlistStore.ts
+│   ├── theme
+│   │   ├── colors.ts
+│   │   ├── index.ts
+│   │   ├── spacing.ts
+│   │   └── typography.ts
+│   ├── types
+│   │   ├── index.ts
+│   │   ├── media.types.ts
+│   │   ├── navigation.types.ts
+│   │   └── user.types.ts
+│   └── utils
+│       ├── constants.ts
+│       ├── formatters.ts
+│       └── validators.ts
+├── structure.txt
+└── tsconfig.json
+
+26 directories, 55 files

@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Container } from '../../components/layout/Container';
 import { PosterGrid } from '../../components/media/PosterGrid';
+import { SegmentedControl } from '../../components/common/SegmentedControl';
 import { colors, spacing, typography } from '../../theme';
 
-export const WatchlistScreen: React.FC = () => {
+type Props = {
+  navigation?: any;
+};
+
+export const WatchlistScreen: React.FC<Props> = () => {
   const [selectedTab, setSelectedTab] = useState<'to_watch' | 'watched'>('to_watch');
 
-  // TODO: Replace with actual watchlist data from Zustand store
   const toWatch: any[] = [];
   const watched: any[] = [];
 
@@ -15,23 +19,12 @@ export const WatchlistScreen: React.FC = () => {
 
   return (
     <Container style={styles.container}>
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'to_watch' && styles.activeTab]}
-          onPress={() => setSelectedTab('to_watch')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'to_watch' && styles.activeTabText]}>
-            To Watch
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'watched' && styles.activeTab]}
-          onPress={() => setSelectedTab('watched')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'watched' && styles.activeTabText]}>
-            Watched
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.toggleWrapper}>
+        <SegmentedControl
+          segments={['To Watch', 'Watched']}
+          selectedIndex={selectedTab === 'to_watch' ? 0 : 1}
+          onChange={(index) => setSelectedTab(index === 0 ? 'to_watch' : 'watched')}
+        />
       </View>
 
       {data.length > 0 ? (
@@ -53,29 +46,10 @@ const styles = StyleSheet.create({
   container: {
     padding: 0,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    margin: spacing.md,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 8,
-    padding: spacing.xs,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: colors.primary,
-  },
-  tabText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-  },
-  activeTabText: {
-    color: colors.background,
+  toggleWrapper: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
   },
   emptyContainer: {
     flex: 1,

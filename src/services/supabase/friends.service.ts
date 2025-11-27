@@ -2,10 +2,14 @@ import { supabase } from './supabase.client';
 import { Profile } from '../../types';
 
 export const friendsService = {
+  // Follow a user
   followUser: async (followerId: string, followingId: string) => {
     const { data, error } = await supabase
       .from('follows')
-      .insert({ follower_id: followerId, following_id: followingId })
+      .insert({
+        follower_id: followerId,
+        following_id: followingId,
+      })
       .select()
       .single();
     
@@ -13,6 +17,7 @@ export const friendsService = {
     return data;
   },
 
+  // Unfollow a user
   unfollowUser: async (followerId: string, followingId: string) => {
     const { error } = await supabase
       .from('follows')
@@ -23,6 +28,7 @@ export const friendsService = {
     if (error) throw error;
   },
 
+  // Get followers
   getFollowers: async (userId: string): Promise<Profile[]> => {
     const { data, error } = await supabase
       .from('follows')
@@ -30,9 +36,10 @@ export const friendsService = {
       .eq('following_id', userId);
     
     if (error) throw error;
-    return data?.map(item => item.profiles) || [];
+    return data?.map((item: any) => item.profiles) || [];
   },
 
+  // Get following
   getFollowing: async (userId: string): Promise<Profile[]> => {
     const { data, error } = await supabase
       .from('follows')
@@ -40,31 +47,10 @@ export const friendsService = {
       .eq('follower_id', userId);
     
     if (error) throw error;
-    return data?.map(item => item.profiles) || [];
+    return data?.map((item: any) => item.profiles) || [];
   },
 
-  getFriends: async (userId: string): Promise<Profile[]> => {
-    const { data: following, error: followingError } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', userId);
-    
-    if (followingError) throw followingError;
-    
-    const followingIds = following?.map(f => f.following_id) || [];
-    
-    if (followingIds.length === 0) return [];
-    
-    const { data: mutualFollows, error: mutualError } = await supabase
-      .from('follows')
-      .select('follower_id, profiles!follows_follower_id_fkey(*)')
-      .eq('following_id', userId)
-      .in('follower_id', followingIds);
-    
-    if (mutualError) throw mutualError;
-    return mutualFollows?.map(item => item.profiles) || [];
-  },
-
+  // Check if following
   isFollowing: async (followerId: string, followingId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('follows')
@@ -75,5 +61,29 @@ export const friendsService = {
     
     if (error) throw error;
     return !!data;
+  },
+
+  // Search profiles by username
+  searchProfiles: async (query: string): Promise<Profile[]> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .ilike('username', `%${query}%`)
+      .limit(20);
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Get single profile
+  getProfile: async (userId: string): Promise<Profile | null> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data;
   },
 };

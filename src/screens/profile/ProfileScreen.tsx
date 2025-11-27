@@ -4,17 +4,26 @@ import { Container } from '../../components/layout/Container';
 import { UserAvatar } from '../../components/user/UserAvatar';
 import { Button } from '../../components/common/Button';
 import { colors, spacing, typography } from '../../theme';
+import { useAuthStore } from '../../store';
+import { authService } from '../../services/supabase/auth.service';
 
-export const ProfileScreen: React.FC = () => {
-  // TODO: Get user data from auth store
-  const user = {
-    username: 'demo_user',
-    full_name: 'Demo User',
-    bio: 'Movie enthusiast and TV show addict 🎬',
-    avatar_url: null,
-  };
+type Props = {
+  navigation?: any;
+};
 
-  // TODO: Get stats from stores
+export const ProfileScreen: React.FC<Props> = () => {
+  const { user, logout } = useAuthStore();
+
+  if (!user) {
+    return (
+      <Container>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Please login to view your profile</Text>
+        </View>
+      </Container>
+    );
+  }
+
   const stats = {
     watchlist: 0,
     watched: 0,
@@ -23,19 +32,21 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const handleEditProfile = () => {
-    // TODO: Navigate to edit profile screen
     console.log('Edit profile');
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout with authService
-    console.log('Logout');
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+      logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
     <Container>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
         <View style={styles.header}>
           <UserAvatar
             avatarUrl={user.avatar_url}
@@ -47,7 +58,6 @@ export const ProfileScreen: React.FC = () => {
           {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
         </View>
 
-        {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{stats.watchlist}</Text>
@@ -70,7 +80,6 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Actions */}
         <View style={styles.actions}>
           <Button title="Edit Profile" onPress={handleEditProfile} variant="primary" />
           <View style={{ height: spacing.md }} />
@@ -132,5 +141,14 @@ const styles = StyleSheet.create({
   },
   actions: {
     marginTop: spacing.lg,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
   },
 });
