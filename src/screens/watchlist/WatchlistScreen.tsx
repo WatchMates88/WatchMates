@@ -5,17 +5,19 @@ import { Container } from '../../components/layout/Container';
 import { PosterGrid } from '../../components/media/PosterGrid';
 import { SegmentedControl } from '../../components/common/SegmentedControl';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 import { useAuthStore } from '../../store';
 import { watchlistService } from '../../services/supabase/watchlist.service';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { Movie, TVShow } from '../../types';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   navigation?: any;
 };
 
 export const WatchlistScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const { user } = useAuthStore();
   const [selectedTab, setSelectedTab] = useState<'to_watch' | 'watched'>('to_watch');
   const [toWatchItems, setToWatchItems] = useState<(Movie | TVShow)[]>([]);
@@ -91,11 +93,15 @@ export const WatchlistScreen: React.FC<Props> = ({ navigation }) => {
 
   if (!user) {
     return (
-      <Container>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Please login to view watchlist</Text>
-        </View>
-      </Container>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Container>
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Please login to view watchlist
+            </Text>
+          </View>
+        </Container>
+      </View>
     );
   }
 
@@ -104,53 +110,58 @@ export const WatchlistScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <Container style={styles.container}>
-      <View style={styles.topSection}>
-        <View style={styles.toggleWrapper}>
-          <SegmentedControl
-            segments={['To Watch', 'Watched']}
-            selectedIndex={selectedTab === 'to_watch' ? 0 : 1}
-            onChange={(index) => setSelectedTab(index === 0 ? 'to_watch' : 'watched')}
-          />
-        </View>
-
-        {/* Collections Button */}
-        <TouchableOpacity
-          style={styles.collectionsButton}
-          onPress={handleCollections}
-          activeOpacity={0.7}
-        >
-          <View style={styles.collectionsIcon}>
-            <Ionicons name="folder-outline" size={18} color={colors.primary} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Container style={styles.container}>
+        <View style={styles.topSection}>
+          <View style={styles.toggleWrapper}>
+            <SegmentedControl
+              segments={['To Watch', 'Watched']}
+              selectedIndex={selectedTab === 'to_watch' ? 0 : 1}
+              onChange={(index) => setSelectedTab(index === 0 ? 'to_watch' : 'watched')}
+            />
           </View>
-          <Text style={styles.collectionsText}>My Collections</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
 
-      {data.length > 0 ? (
-        <PosterGrid 
-          data={data} 
-          onItemPress={handleItemPress}
-        />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>
-            {selectedTab === 'to_watch' ? '📝' : '✅'}
-          </Text>
-          <Text style={styles.emptyText}>
-            {selectedTab === 'to_watch'
-              ? 'No items in your watchlist yet'
-              : "You haven't watched anything yet"}
-          </Text>
-          <Text style={styles.emptySubtext}>
-            {selectedTab === 'to_watch'
-              ? 'Add movies and shows from the detail pages!'
-              : 'Mark items as watched to see them here!'}
-          </Text>
+          {/* Collections Button - Premium style */}
+          <TouchableOpacity
+            style={[styles.collectionsButton, { 
+              backgroundColor: colors.card,
+              borderColor: colors.cardBorder,
+            }]}
+            onPress={handleCollections}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.collectionsIcon, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="folder-outline" size={20} color={colors.primary} />
+            </View>
+            <Text style={[styles.collectionsText, { color: colors.text }]}>My Collections</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.icon} />
+          </TouchableOpacity>
         </View>
-      )}
-    </Container>
+
+        {data.length > 0 ? (
+          <PosterGrid 
+            data={data} 
+            onItemPress={handleItemPress}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>
+              {selectedTab === 'to_watch' ? '📝' : '✅'}
+            </Text>
+            <Text style={[styles.emptyText, { color: colors.text }]}>
+              {selectedTab === 'to_watch'
+                ? 'No items in your watchlist yet'
+                : "You haven't watched anything yet"}
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              {selectedTab === 'to_watch'
+                ? 'Add movies and shows from the detail pages!'
+                : 'Mark items as watched to see them here!'}
+            </Text>
+          </View>
+        )}
+      </Container>
+    </View>
   );
 };
 
@@ -168,23 +179,20 @@ const styles = StyleSheet.create({
   collectionsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 16,
-    padding: spacing.md,
+    borderRadius: 20,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: colors.primary,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 2,
   },
   collectionsIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary + '20',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -193,7 +201,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
-    color: colors.text,
+    letterSpacing: 0.2,
   },
   emptyContainer: {
     flex: 1,
@@ -208,13 +216,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

@@ -6,36 +6,45 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
 import { WatchlistScreen } from '../screens/watchlist/WatchlistScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { colors } from '../theme';
-
-// Import the new FeedScreen (we'll create it next)
 import { FeedScreen } from '../screens/feed/FeedScreen';
+import { useTheme } from '../hooks/useTheme';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
 export const TabNavigator = () => {
+  const { colors } = useTheme();
+  
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarInactiveTintColor: colors.textTertiary,
         headerShown: true,
         headerStyle: {
           backgroundColor: colors.background,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          shadowColor: 'transparent',
+          elevation: 0,
         },
         headerTitleStyle: {
           fontWeight: '600',
+          fontSize: 17,
+          color: colors.text,
         },
         tabBarStyle: {
-          borderTopWidth: 0,
-          elevation: 0,
           backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          elevation: 0,
           paddingTop: 8,
-          height: 80,
+          paddingBottom: 8,
+          height: 85,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '500',
+          marginTop: 4,
         },
       }}
     >

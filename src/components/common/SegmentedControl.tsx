@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform, Animated } from 'react-native';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface SegmentedControlProps {
   segments: string[];
@@ -13,79 +15,117 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   selectedIndex,
   onChange,
 }) => {
+  const { colors, isDark } = useTheme();
   const [animation] = React.useState(new Animated.Value(selectedIndex));
 
   React.useEffect(() => {
     Animated.spring(animation, {
       toValue: selectedIndex,
       useNativeDriver: false,
-      tension: 50,
-      friction: 7,
+      tension: 68,
+      friction: 12,
     }).start();
   }, [selectedIndex]);
 
-  // Multiple pastel gradient options
-  const getGradientColor = (index: number) => {
-    const gradients = [
-      { bg: '#E0BBE4', border: '#D4A5D4', shadow: '#C899CC', text: '#5A3A5C' }, // Lavender
-      { bg: '#A8D8EA', border: '#8AC4D8', shadow: '#7AB5C9', text: '#3A5A6C' }, // Sky Blue
-      { bg: '#FFD1DC', border: '#FFB8C6', shadow: '#FF9FB2', text: '#6C3A4A' }, // Pink
-    ];
-    return gradients[index % gradients.length];
-  };
+  const segmentWidth = 100 / segments.length;
+  const pillPosition = animation.interpolate({
+    inputRange: segments.map((_, i) => i),
+    outputRange: segments.map((_, i) => `${i * segmentWidth}%`),
+  });
 
-  return (
-    <View style={styles.outerContainer}>
-      <View style={styles.container}>
+  if (!isDark) {
+    // Light mode - keep original pastel design
+    return (
+      <View style={[styles.containerLight, { backgroundColor: 'rgba(255, 255, 255, 0.6)' }]}>
         {segments.map((segment, index) => {
           const isSelected = index === selectedIndex;
-          const gradient = getGradientColor(index);
-
-          const scale = animation.interpolate({
-            inputRange: [index - 1, index, index + 1],
-            outputRange: [0.95, 1, 0.95],
-            extrapolate: 'clamp',
-          });
-
-          const opacity = animation.interpolate({
-            inputRange: [index - 1, index, index + 1],
-            outputRange: [0.5, 1, 0.5],
-            extrapolate: 'clamp',
-          });
-
           return (
             <TouchableOpacity
               key={index}
-              style={styles.segmentWrapper}
+              style={styles.segmentWrapperLight}
               onPress={() => onChange(index)}
               activeOpacity={0.9}
             >
               <Animated.View
                 style={[
-                  styles.segment,
+                  styles.segmentLight,
+                  { backgroundColor: 'rgba(255, 255, 255, 0.35)' },
                   isSelected && [
-                    styles.segmentSelected,
-                    { 
-                      backgroundColor: gradient.bg,
-                      borderColor: gradient.border,
-                      transform: [{ scale }],
-                    }
+                    styles.segmentSelectedLight,
+                    { backgroundColor: '#E0BBE4', borderColor: '#D4A5D4' }
                   ],
                 ]}
               >
-                {isSelected && <View style={styles.glassOverlay} />}
-                <Animated.Text 
+                {isSelected && <View style={styles.glassOverlayLight} />}
+                <Text 
                   style={[
-                    styles.text, 
-                    isSelected && [styles.textSelected, { color: gradient.text }],
-                    { opacity }
+                    styles.textLight, 
+                    isSelected && [styles.textSelectedLight, { color: '#5A3A5C' }],
+                    { color: 'rgba(100, 100, 120, 0.75)' }
                   ]}
                   numberOfLines={1}
-                  adjustsFontSizeToFit
                 >
                   {segment}
-                </Animated.Text>
+                </Text>
               </Animated.View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  }
+
+  // Dark mode - Premium Apple capsule style
+  return (
+    <View style={styles.outerContainer}>
+      <View style={[
+        styles.container,
+        { 
+          backgroundColor: colors.toggleContainer,
+          borderColor: colors.primaryBorder,
+        }
+      ]}>
+        {/* Animated pill background */}
+        <Animated.View
+          style={[
+            styles.activePill,
+            {
+              width: `${segmentWidth}%`,
+              left: pillPosition,
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={[colors.toggleActivePillGradientStart, colors.toggleActivePillGradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pillGradient}
+          />
+        </Animated.View>
+
+        {/* Segments */}
+        {segments.map((segment, index) => {
+          const isSelected = index === selectedIndex;
+          
+          return (
+            <TouchableOpacity
+              key={index}
+              style={styles.segment}
+              onPress={() => onChange(index)}
+              activeOpacity={0.7}
+            >
+              <Animated.Text 
+                style={[
+                  styles.text,
+                  { 
+                    color: isSelected ? colors.text : colors.textTertiary,
+                    fontWeight: isSelected ? '600' : '500',
+                  }
+                ]}
+                numberOfLines={1}
+              >
+                {segment}
+              </Animated.Text>
             </TouchableOpacity>
           );
         })}
@@ -100,7 +140,60 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 24,
+    padding: 4,
+    height: 46,
+    borderWidth: 1,
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  activePill: {
+    position: 'absolute',
+    top: 4,
+    height: 38,
+    borderRadius: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#9E73FF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  pillGradient: {
+    flex: 1,
+    borderRadius: 20,
+  },
+  segment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    paddingHorizontal: 8,
+  },
+  text: {
+    fontSize: typography.fontSize.sm,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  
+  // Light mode styles (original pastel)
+  containerLight: {
+    flexDirection: 'row',
     borderRadius: 28,
     padding: 6,
     borderWidth: 1,
@@ -117,24 +210,21 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  segmentWrapper: {
+  segmentWrapperLight: {
     flex: 1,
     marginHorizontal: 3,
   },
-  segment: {
-    paddingVertical: 16,
+  segmentLight: {
+    paddingVertical: 14,
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     position: 'relative',
     overflow: 'hidden',
   },
-  segmentSelected: {
-    backgroundColor: '#E0BBE4',
+  segmentSelectedLight: {
     borderWidth: 1.5,
-    borderColor: '#D4A5D4',
     ...Platform.select({
       ios: {
         shadowColor: '#C899CC',
@@ -147,7 +237,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  glassOverlay: {
+  glassOverlayLight: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -156,15 +246,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 24,
   },
-  text: {
+  textLight: {
     fontSize: typography.fontSize.xs + 1,
     fontWeight: '500',
-    color: 'rgba(100, 100, 120, 0.75)',
     letterSpacing: 0.3,
     zIndex: 1,
     textAlign: 'center',
   },
-  textSelected: {
+  textSelectedLight: {
     fontWeight: '600',
     letterSpacing: 0.4,
   },

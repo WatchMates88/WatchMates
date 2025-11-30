@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text, Image, Platform } from 'react-native';
 import { Container } from '../../components/layout/Container';
 import { SearchBar } from '../../components/search/SearchBar';
 import { PosterGrid } from '../../components/media/PosterGrid';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { SegmentedControl } from '../../components/common/SegmentedControl';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
+import { cacheService } from '../../services/supabase/cache.service';
 import { Movie, TVShow } from '../../types';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   navigation: any;
@@ -15,7 +17,6 @@ type Props = {
 
 type SearchMode = 'genre' | 'ott' | 'language';
 
-// Major Indian OTT Platforms with TMDB IDs and logos
 const INDIAN_OTT_PLATFORMS = [
   { 
     id: 8, 
@@ -71,28 +72,47 @@ const INDIAN_OTT_PLATFORMS = [
     logo: 'https://images.justwatch.com/icon/301683708/s100/max.png',
     gradient: ['#002BE7', '#0020A8'] 
   },
-  { 
-    id: 2100, 
-    name: 'Aha', 
-    logo: 'https://images.justwatch.com/icon/301558099/s100/aha.png',
-    gradient: ['#FF6B35', '#F7931E'] 
-  },
+  
 ];
 
 const LANGUAGES = [
-  { code: 'en', name: 'English', emoji: '🇺🇸', gradient: ['#4F46E5', '#6366F1'] },
-  { code: 'hi', name: 'Hindi', emoji: '🇮🇳', gradient: ['#FF6B35', '#F7931E'] },
-  { code: 'te', name: 'Telugu', emoji: '🇮🇳', gradient: ['#10B981', '#059669'] },
-  { code: 'ta', name: 'Tamil', emoji: '🇮🇳', gradient: ['#14B8A6', '#0D9488'] },
-  { code: 'ml', name: 'Malayalam', emoji: '🇮🇳', gradient: ['#8B5CF6', '#7C3AED'] },
-  { code: 'kn', name: 'Kannada', emoji: '🇮🇳', gradient: ['#EC4899', '#F43F5E'] },
-  { code: 'es', name: 'Spanish', emoji: '🇪🇸', gradient: ['#EF4444', '#DC2626'] },
-  { code: 'fr', name: 'French', emoji: '🇫🇷', gradient: ['#3B82F6', '#2563EB'] },
-  { code: 'de', name: 'German', emoji: '🇩🇪', gradient: ['#FBBF24', '#F59E0B'] },
-  { code: 'ja', name: 'Japanese', emoji: '🇯🇵', gradient: ['#F59E0B', '#D97706'] },
-  { code: 'ko', name: 'Korean', emoji: '🇰🇷', gradient: ['#A855F7', '#9333EA'] },
-  { code: 'zh', name: 'Chinese', emoji: '🇨🇳', gradient: ['#DC2626', '#B91C1C'] },
+  { code: 'en', name: 'English', emoji: '🇺🇸' },
+  { code: 'hi', name: 'Hindi', emoji: '🇮🇳' },
+  { code: 'te', name: 'Telugu', emoji: '🇮🇳' },
+  { code: 'ta', name: 'Tamil', emoji: '🇮🇳' },
+  { code: 'ml', name: 'Malayalam', emoji: '🇮🇳' },
+  { code: 'kn', name: 'Kannada', emoji: '🇮🇳' },
+  { code: 'es', name: 'Spanish', emoji: '🇪🇸' },
+  { code: 'fr', name: 'French', emoji: '🇫🇷' },
+  { code: 'de', name: 'German', emoji: '🇩🇪' },
+  { code: 'ja', name: 'Japanese', emoji: '🇯🇵' },
+  { code: 'ko', name: 'Korean', emoji: '🇰🇷' },
+  { code: 'zh', name: 'Chinese', emoji: '🇨🇳' },
 ];
+
+const LANGUAGE_COLOR_GROUPS: Record<string, string[]> = {
+  blue: ['en', 'fr', 'ko', 'ja'],
+  orange: ['hi', 'te', 'ta', 'ml', 'kn'],
+  red: ['es', 'zh'],
+  yellow: ['de'],
+};
+
+const LANGUAGE_GLOW_COLORS: Record<string, string> = {
+  blue: 'rgba(58,125,255,0.22)',
+  orange: 'rgba(228,127,46,0.22)',
+  red: 'rgba(255,61,61,0.22)',
+  yellow: 'rgba(245,196,0,0.22)',
+  purple: 'rgba(159,115,255,0.22)',
+};
+
+const getGlowColor = (code: string) => {
+  for (const group in LANGUAGE_COLOR_GROUPS) {
+    if (LANGUAGE_COLOR_GROUPS[group].includes(code)) {
+      return LANGUAGE_GLOW_COLORS[group];
+    }
+  }
+  return LANGUAGE_GLOW_COLORS.purple;
+};
 
 const GENRE_EMOJIS: { [key: string]: string } = {
   'Action': '💥',
@@ -117,9 +137,10 @@ const GENRE_EMOJIS: { [key: string]: string } = {
 };
 
 export const SearchScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>('genre');
-  const [searchResults, setSearchResults] = useState<(Movie | TVShow)[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -169,11 +190,11 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleItemPress = (item: Movie | TVShow) => {
-    if ('title' in item) {
-      navigation.navigate('MovieDetail', { movieId: item.id });
+  const handleItemPress = (item: any) => {
+    if ('title' in item || item.media_type === 'movie') {
+      navigation.navigate('MovieDetail', { movieId: item.tmdb_id || item.id });
     } else {
-      navigation.navigate('ShowDetail', { showId: item.id });
+      navigation.navigate('ShowDetail', { showId: item.tmdb_id || item.id });
     }
   };
 
@@ -183,25 +204,16 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
     setSearchQuery('');
   };
 
+  // 🔥 NEW: Uses cache service
   const handleGenrePress = async (genreId: number) => {
     try {
       setLoading(true);
       clearResults();
-      // Get trending movies in this genre
-      const trending = await tmdbService.getTrendingMovies();
-      const filtered = trending.filter(m => m.genre_ids.includes(genreId));
       
-      // If not enough trending, get from discover
-      if (filtered.length < 10) {
-        const discovered = await tmdbService.discoverMovies({ 
-          with_genres: genreId.toString(),
-          page: 1
-        });
-        setSearchResults([...filtered, ...discovered.filter(d => !filtered.find(f => f.id === d.id))]);
-      } else {
-        setSearchResults(filtered);
-      }
+      console.log(`[Search] Fetching cached movies for genre ${genreId}...`);
+      const cached = await cacheService.getMoviesByGenre(genreId, 20);
       
+      setSearchResults(cached);
       setShowResults(true);
     } catch (error) {
       console.error('Error loading genre:', error);
@@ -210,31 +222,16 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // 🔥 NEW: Uses cache service
   const handleLanguagePress = async (languageCode: string) => {
     try {
       setLoading(true);
       clearResults();
       
-      // Get trending movies first
-      const trending = await tmdbService.getTrendingMovies();
-      const trendingTV = await tmdbService.getTrendingTVShows();
+      console.log(`[Search] Fetching cached movies for language ${languageCode}...`);
+      const cached = await cacheService.getMoviesByLanguage(languageCode, 20);
       
-      // Filter by language
-      const filtered = [...trending, ...trendingTV].filter(
-        m => m.original_language === languageCode
-      );
-      
-      // If not enough, get from discover
-      if (filtered.length < 10) {
-        const discovered = await tmdbService.discoverMovies({ 
-          with_original_language: languageCode,
-          page: 1
-        });
-        setSearchResults([...filtered, ...discovered.filter(d => !filtered.find(f => f.id === d.id))]);
-      } else {
-        setSearchResults(filtered.slice(0, 20));
-      }
-      
+      setSearchResults(cached);
       setShowResults(true);
     } catch (error) {
       console.error('Error loading language:', error);
@@ -243,24 +240,24 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // 🔥 NEW: Uses cache service with provider filtering
   const handleOTTPress = async (platform: typeof INDIAN_OTT_PLATFORMS[0]) => {
     try {
       setLoading(true);
       clearResults();
       
-      // Get popular and trending movies
-      const [popular, trending] = await Promise.all([
-        tmdbService.getPopularMovies(1),
-        tmdbService.getTrendingMovies('week'),
-      ]);
+      console.log(`[Search] Fetching cached movies for provider ${platform.name}...`);
+      const cached = await cacheService.getMoviesByProvider(platform.id, 'IN', 20);
       
-      // Combine and deduplicate
-      const combined = [...trending, ...popular];
-      const unique = combined.filter((movie, index, self) =>
-        index === self.findIndex((m) => m.id === movie.id)
-      );
+      // If no cached results, fallback to popular
+      if (cached.length === 0) {
+        console.log(`[Search] No cached results, using popular fallback...`);
+        const popular = await cacheService.getPopularMovies(20);
+        setSearchResults(popular);
+      } else {
+        setSearchResults(cached);
+      }
       
-      setSearchResults(unique.slice(0, 20));
       setShowResults(true);
     } catch (error) {
       console.error('Error loading OTT:', error);
@@ -290,29 +287,55 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderGenreCards = () => (
     <View style={styles.gridContainer}>
-      {genres.map((genre, index) => {
+      {genres.map((genre) => {
         const emoji = GENRE_EMOJIS[genre.name] || '🎬';
-        const colorIndex = index % 6;
-        const gradients = [
-          ['#6366F1', '#818CF8'],
-          ['#EC4899', '#F472B6'],
-          ['#10B981', '#34D399'],
-          ['#F59E0B', '#FBBF24'],
-          ['#EF4444', '#F87171'],
-          ['#8B5CF6', '#A78BFA'],
-        ];
         
+        const genreGlowColors: { [key: string]: string } = {
+          'Action': 'rgba(255, 107, 107, 0.22)',
+          'Adventure': 'rgba(92, 201, 255, 0.22)',
+          'Animation': 'rgba(255, 197, 92, 0.22)',
+          'Comedy': 'rgba(255, 184, 108, 0.22)',
+          'Crime': 'rgba(255, 92, 139, 0.22)',
+          'Documentary': 'rgba(94, 143, 255, 0.22)',
+          'Drama': 'rgba(159, 115, 255, 0.22)',
+          'Family': 'rgba(92, 255, 179, 0.22)',
+          'Fantasy': 'rgba(124, 92, 255, 0.22)',
+          'History': 'rgba(255, 184, 108, 0.22)',
+          'Horror': 'rgba(255, 92, 139, 0.22)',
+          'Music': 'rgba(159, 115, 255, 0.22)',
+          'Mystery': 'rgba(94, 143, 255, 0.22)',
+          'Romance': 'rgba(255, 92, 139, 0.22)',
+          'Science Fiction': 'rgba(92, 201, 255, 0.22)',
+          'Thriller': 'rgba(255, 92, 139, 0.22)',
+          'War': 'rgba(255, 184, 108, 0.22)',
+          'Western': 'rgba(255, 184, 108, 0.22)',
+          'TV Movie': 'rgba(94, 143, 255, 0.22)',
+        };
+
+        const glowColor = genreGlowColors[genre.name] || 'rgba(159, 115, 255, 0.22)';
+
         return (
           <TouchableOpacity
             key={genre.id}
-            style={[styles.modernCard, { backgroundColor: gradients[colorIndex][0] + '15' }]}
+            style={[
+              styles.genreCard,
+              { 
+                backgroundColor: colors.genreCardBg,
+                borderColor: colors.primaryBorder,
+              }
+            ]}
             onPress={() => handleGenrePress(genre.id)}
             activeOpacity={0.7}
           >
-            <View style={[styles.cardEmoji, { backgroundColor: gradients[colorIndex][0] + '25' }]}>
-              <Text style={styles.cardEmojiText}>{emoji}</Text>
+            <View style={[
+              styles.genreEmojiContainer,
+              { backgroundColor: glowColor }
+            ]}>
+              <Text style={styles.genreEmoji}>{emoji}</Text>
             </View>
-            <Text style={styles.cardName}>{genre.name}</Text>
+            <Text style={[styles.genreName, { color: colors.text }]}>
+              {genre.name}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -324,10 +347,21 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
       {INDIAN_OTT_PLATFORMS.map((platform) => (
         <TouchableOpacity
           key={platform.id}
-          style={[styles.ottCard]}
+          style={[
+            styles.ottCard, 
+            { 
+              backgroundColor: colors.card,
+              borderColor: colors.cardBorder,
+            }
+          ]}
           onPress={() => handleOTTPress(platform)}
           activeOpacity={0.7}
         >
+          <View style={[
+            styles.logoGlow,
+            { backgroundColor: platform.gradient[0], opacity: 0.14 }
+          ]} />
+          
           <View style={styles.ottLogoContainer}>
             <Image
               source={{ uri: platform.logo }}
@@ -335,8 +369,10 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.ottName} numberOfLines={1}>{platform.name}</Text>
-          <View style={[styles.cardAccent, { backgroundColor: platform.gradient[0] }]} />
+          
+          <Text style={[styles.ottName, { color: colors.textSecondary }]} numberOfLines={1}>
+            {platform.name}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -344,19 +380,34 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderLanguageCards = () => (
     <View style={styles.gridContainer}>
-      {LANGUAGES.map((language) => (
-        <TouchableOpacity
-          key={language.code}
-          style={[styles.modernCard, { backgroundColor: language.gradient[0] + '12' }]}
-          onPress={() => handleLanguagePress(language.code)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.cardEmoji, { backgroundColor: language.gradient[0] + '25' }]}>
-            <Text style={styles.cardEmojiText}>{language.emoji}</Text>
-          </View>
-          <Text style={styles.cardName}>{language.name}</Text>
-        </TouchableOpacity>
-      ))}
+      {LANGUAGES.map((language) => {
+        const glow = getGlowColor(language.code);
+
+        return (
+          <TouchableOpacity
+            key={language.code}
+            style={[
+              styles.languageCard,
+              {
+                backgroundColor: '#181524',
+                borderColor: colors.cardBorder,
+              }
+            ]}
+            onPress={() => handleLanguagePress(language.code)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.languageGlow, { backgroundColor: glow }]} />
+
+            <View style={styles.languageLogoContainer}>
+              <Text style={{ fontSize: 34 }}>{language.emoji}</Text>
+            </View>
+
+            <Text style={styles.languageText}>
+              {language.name}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 
@@ -365,43 +416,45 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <Container style={styles.container}>
-      <View style={styles.searchSection}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={handleSearch}
-          placeholder="Search movies & TV shows..."
-        />
-      </View>
-
-      {showResults && searchResults.length > 0 ? (
-        <View style={styles.resultsWrapper}>
-          <View style={styles.backButtonContainer}>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={clearResults}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.backButtonText}>← Back to Browse</Text>
-            </TouchableOpacity>
-          </View>
-          <PosterGrid 
-            data={searchResults} 
-            onItemPress={handleItemPress}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Container style={styles.container}>
+        <View style={styles.searchSection}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholder="Search movies & TV shows..."
           />
         </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {renderToggleButtons()}
-          
-          <View style={styles.contentContainer}>
-            {searchMode === 'genre' && renderGenreCards()}
-            {searchMode === 'ott' && renderOTTCards()}
-            {searchMode === 'language' && renderLanguageCards()}
+
+        {showResults && searchResults.length > 0 ? (
+          <View style={styles.resultsWrapper}>
+            <View style={styles.backButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.backButton, { backgroundColor: colors.backgroundSecondary }]} 
+                onPress={clearResults}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.backButtonText, { color: colors.primary }]}>← Back to Browse</Text>
+              </TouchableOpacity>
+            </View>
+            <PosterGrid 
+              data={searchResults} 
+              onItemPress={handleItemPress}
+            />
           </View>
-        </ScrollView>
-      )}
-    </Container>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {renderToggleButtons()}
+            
+            <View style={styles.contentContainer}>
+              {searchMode === 'genre' && renderGenreCards()}
+              {searchMode === 'ott' && renderOTTCards()}
+              {searchMode === 'language' && renderLanguageCards()}
+            </View>
+          </ScrollView>
+        )}
+      </Container>
+    </View>
   );
 };
 
@@ -425,88 +478,127 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  modernCard: {
+  genreCard: {
     width: '48%',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
-    padding: spacing.md,
+    borderRadius: 22,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    position: 'relative',
-    overflow: 'hidden',
+    borderWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  cardEmoji: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  genreEmojiContainer: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  cardEmojiText: {
-    fontSize: 32,
+  genreEmoji: {
+    fontSize: 34,
   },
-  cardName: {
+  genreName: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  // OTT Platform Cards with Logo
   ottCard: {
     width: '48%',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
-    padding: spacing.md,
+    borderRadius: 22,
+    padding: spacing.xl,
     marginBottom: spacing.md,
     alignItems: 'center',
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 2,
     position: 'relative',
-    overflow: 'hidden',
-    paddingBottom: spacing.lg,
+    overflow: 'visible',
+  },
+  logoGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    top: 12,
+    alignSelf: 'center',
   },
   ottLogoContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 12,
+    shadowColor: 'rgba(255, 255, 255, 0.08)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 4,
+    marginBottom: spacing.md,
   },
   ottLogo: {
     width: '100%',
     height: '100%',
   },
   ottName: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    fontSize: 15,
+    fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  cardAccent: {
+  languageCard: {
+    width: '48%',
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    overflow: 'visible',
+  },
+  languageGlow: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    top: 10,
+    alignSelf: 'center',
+    opacity: 0.22,
+  },
+  languageLogoContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    marginBottom: spacing.sm,
+  },
+  languageText: {
+    color: '#B9B4C8',
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 12,
   },
   resultsWrapper: {
     flex: 1,
@@ -516,7 +608,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   backButton: {
-    backgroundColor: colors.backgroundSecondary,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 8,
@@ -524,8 +615,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   backButtonText: {
-    color: colors.primary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
 });
+
+export default SearchScreen;

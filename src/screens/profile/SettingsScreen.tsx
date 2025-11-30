@@ -1,32 +1,194 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types';
 import { colors, spacing, typography } from '../../theme';
-import { useAuthStore } from '../../store';
+import { useAuthStore, useThemeStore } from '../../store';
 import { authService } from '../../services/supabase/auth.service';
+import { supabase } from '../../services/supabase/supabase.client';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, logout } = useAuthStore();
-  const [darkMode, setDarkMode] = useState(false);
+  const { user, logout, setUser } = useAuthStore();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  const handleEditPhoto = () => {
-    Alert.alert('Coming Soon', 'Profile picture upload will be available soon!');
+  const handleEditPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Needed', 'Please grant camera roll permissions in your phone settings');
+      return;
+    }
+
+    Alert.alert(
+      'Choose Photo',
+      'Select a source',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+            if (cameraStatus.status !== 'granted') {
+              Alert.alert('Permission Needed', 'Please grant camera permissions');
+              return;
+            }
+            
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+
+            if (!result.canceled && user) {
+              await uploadPhoto(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Photo Library',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+
+            if (!result.canceled && user) {
+              await uploadPhoto(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    if (!user) return;
+
+    try {
+      setUploadingPhoto(true);
+      const avatarUrl = await authService.uploadAvatar(user.id, uri);
+      
+      // Update local user state
+      const updatedProfile = await authService.getProfile(user.id);
+      if (updatedProfile) {
+        setUser(updatedProfile);
+      }
+      
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      Alert.alert('Upload Failed', error.message || 'Failed to upload photo. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleChangeUsername = () => {
-    Alert.alert('Coming Soon', 'Username change will be available soon!');
+    if (!user) return;
+
+    Alert.prompt(
+      'Change Username',
+      `Current: @${user.username}`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Update',
+          onPress: async (newUsername?: string) => {
+            if (!newUsername || newUsername.trim().length < 3) {
+              Alert.alert('Error', 'Username must be at least 3 characters');
+              return;
+            }
+
+            try {
+              await authService.updateProfile(user.id, { username: newUsername.trim() });
+              const updatedProfile = await authService.getProfile(user.id);
+              if (updatedProfile) setUser(updatedProfile);
+              Alert.alert('Success', 'Username updated!');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to update username');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      user.username
+    );
   };
 
   const handleChangeEmail = () => {
-    Alert.alert('Coming Soon', 'Email change will be available soon!');
+    Alert.prompt(
+      'Change Email',
+      'Enter your new email address',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Update',
+          onPress: async (newEmail?: string) => {
+            if (!newEmail || !newEmail.includes('@')) {
+              Alert.alert('Error', 'Please enter a valid email');
+              return;
+            }
+
+            try {
+              const { error } = await supabase.auth.updateUser({ email: newEmail });
+              if (error) throw error;
+              Alert.alert('Success', 'Check your new email for verification link!');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to update email');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   const handleChangePassword = () => {
-    Alert.alert('Coming Soon', 'Password change will be available soon!');
+    Alert.prompt(
+      'Change Password',
+      'Enter your new password (min 6 characters)',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Update',
+          onPress: async (newPassword?: string) => {
+            if (!newPassword || newPassword.length < 6) {
+              Alert.alert('Error', 'Password must be at least 6 characters');
+              return;
+            }
+
+            try {
+              const { error } = await supabase.auth.updateUser({ password: newPassword });
+              if (error) throw error;
+              Alert.alert('Success', 'Password updated successfully!');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to update password');
+            }
+          },
+        },
+      ],
+      'secure-text'
+    );
   };
 
   const handleConnectedAccounts = () => {
@@ -38,10 +200,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       'Delete Account',
       'Are you absolutely sure? This action cannot be undone. All your data will be permanently deleted.',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -53,42 +212,9 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const handleLanguage = () => {
-    Alert.alert('Coming Soon', 'Language selection coming soon!');
-  };
-
-  const handleRegion = () => {
-    Alert.alert('Coming Soon', 'Region selection coming soon!');
-  };
-
-  const handleGenrePreferences = () => {
-    Alert.alert('Coming Soon', 'Genre preferences coming soon!');
-  };
-
-  const handleTerms = async () => {
-    const url = 'https://watchmates.app/terms';
-    Alert.alert('Terms of Service', 'Terms of Service will open in your browser.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open', onPress: () => Linking.openURL(url).catch(() => {}) },
-    ]);
-  };
-
-  const handlePrivacy = async () => {
-    const url = 'https://watchmates.app/privacy';
-    Alert.alert('Privacy Policy', 'Privacy Policy will open in your browser.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open', onPress: () => Linking.openURL(url).catch(() => {}) },
-    ]);
-  };
-
-  const handleLicenses = () => {
-    Alert.alert('Open Source Licenses', 'This app uses the following open-source libraries:\n\n• React Native\n• Expo\n• Supabase\n• React Navigation\n• Zustand\n• Ionicons');
-  };
-
   const handleSupport = async () => {
     const email = 'support@watchmates.app';
-    const subject = 'Support Request';
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+    const url = `mailto:${email}?subject=${encodeURIComponent('Support Request')}`;
     
     Linking.openURL(url).catch(() => {
       Alert.alert('Contact Support', `Email us at: ${email}`);
@@ -100,10 +226,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       'Logout',
       'Are you sure you want to logout?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -138,6 +261,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     destructive = false,
     showChevron = true,
     isLast = false,
+    loading = false,
   }: { 
     icon: string; 
     title: string; 
@@ -146,11 +270,13 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     destructive?: boolean;
     showChevron?: boolean;
     isLast?: boolean;
+    loading?: boolean;
   }) => (
     <TouchableOpacity
       style={[styles.settingsRow, isLast && styles.settingsRowLast]}
       onPress={onPress}
       activeOpacity={0.7}
+      disabled={loading}
     >
       <View style={[styles.iconContainer, destructive && styles.iconContainerDestructive]}>
         <Ionicons 
@@ -167,9 +293,11 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.settingsRowSubtitle}>{subtitle}</Text>
         )}
       </View>
-      {showChevron && (
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.primary} />
+      ) : showChevron ? (
         <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -208,16 +336,16 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* 1. Account Settings */}
         <SettingsSection title="Account">
           <SettingsRow
             icon="camera-outline"
             title="Edit Profile Picture"
-            subtitle="Upload or change your avatar"
+            subtitle="Upload from camera or gallery"
             onPress={handleEditPhoto}
+            loading={uploadingPhoto}
           />
           <SettingsRow
             icon="person-outline"
@@ -245,63 +373,58 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           />
         </SettingsSection>
 
-        {/* 2. App Preferences */}
         <SettingsSection title="App Preferences">
           <ToggleRow
             icon="moon-outline"
             title="Dark Mode"
-            subtitle="Switch between themes"
-            value={darkMode}
-            onValueChange={setDarkMode}
+            subtitle="Cinematic theme"
+            value={isDark}
+            onValueChange={toggleTheme}
           />
           <SettingsRow
             icon="language-outline"
             title="Language"
             subtitle="English"
-            onPress={handleLanguage}
+            onPress={() => Alert.alert('Coming Soon')}
           />
           <SettingsRow
             icon="globe-outline"
             title="Region"
             subtitle="India"
-            onPress={handleRegion}
+            onPress={() => Alert.alert('Coming Soon')}
           />
           <SettingsRow
             icon="film-outline"
             title="Preferred Genres"
-            subtitle="Refine recommendations"
-            onPress={handleGenrePreferences}
+            onPress={() => Alert.alert('Coming Soon')}
             isLast
           />
         </SettingsSection>
 
-        {/* 3. Support & Legal */}
         <SettingsSection title="Support & Legal">
           <SettingsRow
             icon="help-circle-outline"
             title="Contact Support"
-            subtitle="Get help with your account"
             onPress={handleSupport}
           />
           <SettingsRow
             icon="document-text-outline"
             title="Terms of Service"
-            onPress={handleTerms}
+            onPress={() => Linking.openURL('https://watchmates.app/terms')}
           />
           <SettingsRow
             icon="shield-checkmark-outline"
             title="Privacy Policy"
-            onPress={handlePrivacy}
+            onPress={() => Linking.openURL('https://watchmates.app/privacy')}
           />
           <SettingsRow
             icon="code-outline"
             title="Open Source Licenses"
-            onPress={handleLicenses}
+            onPress={() => Alert.alert('Open Source', 'React Native, Expo, Supabase, React Navigation, Zustand, Ionicons')}
             isLast
           />
         </SettingsSection>
 
-        {/* 4. Account Actions */}
         <SettingsSection title="Account Actions">
           <SettingsRow
             icon="log-out-outline"
@@ -320,11 +443,10 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           />
         </SettingsSection>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerVersion}>WatchMates v1.0.0</Text>
           <Text style={styles.footerText}>Made with 💜 for movie lovers</Text>
-          <Text style={styles.footerCopyright}>© 2024 WatchMates. All rights reserved.</Text>
+          <Text style={styles.footerCopyright}>© 2024 WatchMates</Text>
         </View>
       </ScrollView>
     </View>
@@ -334,7 +456,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingVertical: spacing.lg,

@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingVi
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { Button } from '../../components/common/Button';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 import { authService } from '../../services/supabase/auth.service';
 import { useAuthStore } from '../../store';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>;
 
 export const SignupScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +21,6 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const { setUser } = useAuthStore();
 
   const handleSignup = async () => {
-    // Validation
     if (!username || !email || !password || !confirmPassword) {
       setError('Please fill in all fields');
       return;
@@ -49,7 +50,6 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
       if (user) {
         const profile = await authService.getProfile(user.id);
         setUser(profile);
-        // Navigation will happen automatically
       }
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -62,26 +62,35 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.content}>
           {/* Header */}
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join WatchMates today!</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Join WatchMates today!
+          </Text>
 
           {/* Error Message */}
           {error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={[styles.errorContainer, {
+              backgroundColor: colors.error + '20',
+              borderColor: colors.error + '40',
+            }]}>
+              <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
             </View>
           ) : null}
 
           {/* Input Fields */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Username</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Username</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                borderColor: colors.cardBorder,
+                color: colors.text,
+              }]}
               placeholder="johndoe"
               placeholderTextColor={colors.textTertiary}
               value={username}
@@ -92,9 +101,13 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                borderColor: colors.cardBorder,
+                color: colors.text,
+              }]}
               placeholder="your@email.com"
               placeholderTextColor={colors.textTertiary}
               value={email}
@@ -106,9 +119,13 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Password</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                borderColor: colors.cardBorder,
+                color: colors.text,
+              }]}
               placeholder="••••••••"
               placeholderTextColor={colors.textTertiary}
               value={password}
@@ -119,9 +136,13 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirm Password</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Confirm Password</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                borderColor: colors.cardBorder,
+                color: colors.text,
+              }]}
               placeholder="••••••••"
               placeholderTextColor={colors.textTertiary}
               value={confirmPassword}
@@ -141,9 +162,11 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Login Link */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
+            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+              Already have an account?{' '}
+            </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.footerLink}>Login</Text>
+              <Text style={[styles.footerLink, { color: colors.primary }]}>Login</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -155,7 +178,6 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -167,43 +189,40 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    fontWeight: '800',
     marginBottom: spacing.xs,
+    letterSpacing: -1,
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
     marginBottom: spacing.xxl,
+    fontWeight: '500',
   },
   errorContainer: {
-    backgroundColor: colors.error + '20',
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: 16,
     marginBottom: spacing.lg,
+    borderWidth: 1,
   },
   errorText: {
-    color: colors.error,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
+    fontWeight: '600',
   },
   inputContainer: {
     marginBottom: spacing.lg,
   },
   label: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
+    fontWeight: '700',
     marginBottom: spacing.sm,
+    letterSpacing: 0.2,
   },
   input: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    padding: spacing.md,
+    borderRadius: 16,
+    padding: spacing.lg,
     fontSize: typography.fontSize.md,
-    color: colors.text,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   footer: {
     flexDirection: 'row',
@@ -212,11 +231,9 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
   },
   footerLink: {
     fontSize: typography.fontSize.sm,
-    color: colors.primary,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: '700',
   },
 });

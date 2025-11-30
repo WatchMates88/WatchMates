@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { spacing } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
 
 interface ContainerProps {
   children: React.ReactNode;
@@ -8,13 +9,18 @@ interface ContainerProps {
 }
 
 export const Container: React.FC<ContainerProps> = ({ children, style }) => {
-  return <View style={[styles.container, style]}>{children}</View>;
+  const { colors } = useTheme();
+  
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }, style]}>
+      {children}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     padding: spacing.md,
   },
 });

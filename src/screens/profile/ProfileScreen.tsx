@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../theme';
+import * as ImagePicker from 'expo-image-picker';
+import { spacing, typography } from '../../theme';
 import { useAuthStore, usePostsStore, useFriendsStore } from '../../store';
 import { UserAvatar } from '../../components/user/UserAvatar';
 import { Post, Profile } from '../../types';
+import { authService } from '../../services/supabase/auth.service';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   navigation?: any;
@@ -13,12 +16,14 @@ type Props = {
 type FriendsView = 'none' | 'friends' | 'followers' | 'following';
 
 export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
+  const { colors } = useTheme();
   const { userPosts, fetchUserPosts } = usePostsStore();
   const { followers, following, mutuals, fetchFollowers, fetchFollowing } = useFriendsStore();
   
   const [friendsView, setFriendsView] = useState<FriendsView>('none');
   const [searchQuery, setSearchQuery] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -46,6 +51,80 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleShare = () => {
     console.log('Share profile');
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    if (!user) return;
+
+    try {
+      setUploadingPhoto(true);
+      await authService.uploadAvatar(user.id, uri);
+      
+      // Refresh user profile to get new avatar URL
+      const updatedProfile = await authService.getProfile(user.id);
+      if (updatedProfile) {
+        setUser(updatedProfile);
+      }
+      
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      Alert.alert('Upload Failed', error.message || 'Failed to upload photo. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Needed', 'Please grant permissions in settings');
+      return;
+    }
+
+    Alert.alert(
+      'Profile Picture',
+      'Choose a source',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+            if (cameraStatus.status !== 'granted') {
+              Alert.alert('Permission Needed', 'Please grant camera permissions');
+              return;
+            }
+            
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+
+            if (!result.canceled) {
+              await uploadPhoto(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Gallery',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+
+            if (!result.canceled) {
+              await uploadPhoto(result.assets[0].uri);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const handleUserPress = (profile: Profile) => {
@@ -78,17 +157,10 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     let users: Profile[] = [];
     
     switch (friendsView) {
-      case 'friends':
-        users = mutuals;
-        break;
-      case 'followers':
-        users = followers;
-        break;
-      case 'following':
-        users = following;
-        break;
-      default:
-        return [];
+      case 'friends': users = mutuals; break;
+      case 'followers': users = followers; break;
+      case 'following': users = following; break;
+      default: return [];
     }
 
     if (searchQuery.trim()) {
@@ -102,77 +174,78 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderPost = ({ item }: { item: Post }) => (
-    <TouchableOpacity
-      style={styles.postCard}
-      onPress={() => handlePostPress(item)}
+    <TouchableOpacity 
+      style={[styles.postCard, { 
+        backgroundColor: colors.card,
+        borderColor: colors.cardBorder,
+      }]} 
+      onPress={() => handlePostPress(item)} 
       activeOpacity={0.7}
     >
-      <Text style={styles.postReview} numberOfLines={3}>{item.review_text}</Text>
-      
+      <Text style={[styles.postReview, { color: colors.textSecondary }]} numberOfLines={3}>{item.review_text}</Text>
       {item.rating && (
         <View style={styles.postRating}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <Ionicons
-              key={star}
-              name={star <= item.rating! ? 'star' : 'star-outline'}
-              size={12}
-              color="#FFD700"
-            />
+            <Ionicons key={star} name={star <= item.rating! ? 'star' : 'star-outline'} size={12} color="#FFD700" />
           ))}
         </View>
       )}
-      
       <View style={styles.postMeta}>
-        <Text style={styles.postMediaTitle} numberOfLines={1}>{item.media_title}</Text>
-        <Text style={styles.postTime}>{formatTimeAgo(item.created_at)}</Text>
+        <Text style={[styles.postMediaTitle, { color: colors.primary }]} numberOfLines={1}>{item.media_title}</Text>
+        <Text style={[styles.postTime, { color: colors.textTertiary }]}>{formatTimeAgo(item.created_at)}</Text>
       </View>
     </TouchableOpacity>
   );
 
   const renderUserItem = ({ item }: { item: Profile }) => (
-    <TouchableOpacity
-      style={styles.userCard}
-      onPress={() => handleUserPress(item)}
+    <TouchableOpacity 
+      style={[styles.userCard, { 
+        backgroundColor: colors.card,
+        borderColor: colors.cardBorder,
+      }]} 
+      onPress={() => handleUserPress(item)} 
       activeOpacity={0.7}
     >
       <UserAvatar avatarUrl={item.avatar_url} username={item.username} size={48} />
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.full_name || item.username}</Text>
-        <Text style={styles.userUsername}>@{item.username}</Text>
+        <Text style={[styles.userName, { color: colors.text }]}>{item.full_name || item.username}</Text>
+        <Text style={[styles.userUsername, { color: colors.textSecondary }]}>@{item.username}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+      <Ionicons name="chevron-forward" size={20} color={colors.icon} />
     </TouchableOpacity>
   );
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Please login to view your profile</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Please login</Text>
         </View>
       </View>
     );
   }
 
-  // Show Friends List View
   if (friendsView !== 'none') {
     const filteredUsers = getFilteredUsers();
     const title = friendsView === 'friends' ? 'Friends' : friendsView === 'followers' ? 'Followers' : 'Following';
 
     return (
-      <View style={styles.container}>
-        <View style={styles.listHeader}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.listHeader, { 
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border 
+        }]}>
           <TouchableOpacity onPress={() => { setFriendsView('none'); setSearchQuery(''); }} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.listTitle}>{title}</Text>
+          <Text style={[styles.listTitle, { color: colors.text }]}>{title}</Text>
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search..."
             placeholderTextColor={colors.textTertiary}
             value={searchQuery}
@@ -187,7 +260,7 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           contentContainerStyle={styles.userList}
           ListEmptyComponent={
             <View style={styles.emptyUsers}>
-              <Text style={styles.emptyUsersText}>
+              <Text style={[styles.emptyUsersText, { color: colors.textSecondary }]}>
                 {searchQuery ? 'No users found' : `No ${title.toLowerCase()} yet`}
               </Text>
             </View>
@@ -197,95 +270,106 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  // Main Profile View
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={handleShare} activeOpacity={0.7}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <TouchableOpacity 
+          style={[styles.headerButton, { 
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: colors.border 
+          }]} 
+          onPress={handleShare}
+        >
           <Ionicons name="share-outline" size={24} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton} onPress={handleSettings} activeOpacity={0.7}>
+        <TouchableOpacity 
+          style={[styles.headerButton, { 
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: colors.border 
+          }]} 
+          onPress={handleSettings}
+        >
           <Ionicons name="settings-outline" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={{ backgroundColor: colors.background, paddingBottom: spacing.xxl }}
+      >
+        <View style={[styles.content, { backgroundColor: colors.background }]}>
           <View style={styles.avatarWrapper}>
-            <View style={styles.avatarGradient}>
-              <Text style={styles.avatarLetter}>
-                {(user.full_name || user.username).charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.editBadge} activeOpacity={0.7}>
+            {uploadingPhoto ? (
+              <View style={[styles.avatarLoading, { backgroundColor: colors.backgroundSecondary }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <UserAvatar 
+                avatarUrl={user.avatar_url} 
+                username={user.username} 
+                size={110} 
+              />
+            )}
+            <TouchableOpacity 
+              style={[styles.editBadge, { 
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.background 
+              }]} 
+              onPress={handleUploadPhoto}
+              disabled={uploadingPhoto}
+            >
               <Ionicons name="camera" size={16} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.displayName}>{user.full_name || user.username}</Text>
-          <Text style={styles.username}>@{user.username}</Text>
+          <Text style={[styles.displayName, { color: colors.text }]}>{user.full_name || user.username}</Text>
+          <Text style={[styles.username, { color: colors.textSecondary }]}>@{user.username}</Text>
 
           {user.bio ? (
-            <Text style={styles.bio} numberOfLines={3}>{user.bio}</Text>
+            <Text style={[styles.bio, { color: colors.textSecondary }]} numberOfLines={3}>{user.bio}</Text>
           ) : (
-            <Text style={styles.bioPlaceholder} numberOfLines={3}>
+            <Text style={[styles.bioPlaceholder, { color: colors.textTertiary }]} numberOfLines={3}>
               Cinema lover. Sci-fi enthusiast. Always looking for the next hidden gem. 🎥 ✨
             </Text>
           )}
 
-          <View style={styles.followStatsCard}>
-            <TouchableOpacity 
-              style={styles.followStat}
-              onPress={() => setFriendsView('friends')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.followNumber}>{mutuals.length}</Text>
-              <Text style={styles.followLabel}>FRIENDS</Text>
+          <View style={[styles.followStatsCard, { 
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
+            <TouchableOpacity style={styles.followStat} onPress={() => setFriendsView('friends')}>
+              <Text style={[styles.followNumber, { color: colors.text }]}>{mutuals.length}</Text>
+              <Text style={[styles.followLabel, { color: colors.textTertiary }]}>FRIENDS</Text>
             </TouchableOpacity>
-            
-            <View style={styles.followDivider} />
-            
-            <TouchableOpacity 
-              style={styles.followStat}
-              onPress={() => setFriendsView('followers')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.followNumber}>{followers.length}</Text>
-              <Text style={styles.followLabel}>FOLLOWERS</Text>
+            <View style={[styles.followDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.followStat} onPress={() => setFriendsView('followers')}>
+              <Text style={[styles.followNumber, { color: colors.text }]}>{followers.length}</Text>
+              <Text style={[styles.followLabel, { color: colors.textTertiary }]}>FOLLOWERS</Text>
             </TouchableOpacity>
-            
-            <View style={styles.followDivider} />
-            
-            <TouchableOpacity 
-              style={styles.followStat}
-              onPress={() => setFriendsView('following')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.followNumber}>{following.length}</Text>
-              <Text style={styles.followLabel}>FOLLOWING</Text>
+            <View style={[styles.followDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.followStat} onPress={() => setFriendsView('following')}>
+              <Text style={[styles.followNumber, { color: colors.text }]}>{following.length}</Text>
+              <Text style={[styles.followLabel, { color: colors.textTertiary }]}>FOLLOWING</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.postsSection}>
             <View style={styles.postsSectionHeader}>
-              <Text style={styles.postsSectionTitle}>My Reviews</Text>
-              <Text style={styles.postsCount}>{userPosts.length}</Text>
+              <Text style={[styles.postsSectionTitle, { color: colors.text }]}>My Reviews</Text>
+              <Text style={[styles.postsCount, { color: colors.textSecondary }]}>{userPosts.length}</Text>
             </View>
 
             {userPosts.length > 0 ? (
-              <FlatList
-                data={userPosts}
-                renderItem={renderPost}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
+              <FlatList data={userPosts} renderItem={renderPost} keyExtractor={(item) => item.id} scrollEnabled={false} />
             ) : (
-              <View style={styles.emptyPosts}>
+              <View style={[styles.emptyPosts, { 
+                backgroundColor: colors.card,
+                borderColor: colors.cardBorder,
+              }]}>
                 <Text style={styles.emptyPostsEmoji}>✍️</Text>
-                <Text style={styles.emptyPostsText}>No reviews yet</Text>
-                <Text style={styles.emptyPostsSubtext}>
-                  Watch something and share your thoughts!
-                </Text>
+                <Text style={[styles.emptyPostsText, { color: colors.text }]}>No reviews yet</Text>
+                <Text style={[styles.emptyPostsSubtext, { color: colors.textSecondary }]}>Watch something and share your thoughts!</Text>
               </View>
             )}
           </View>
@@ -296,301 +380,218 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  container: { 
     flex: 1,
-    backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: spacing.lg, 
+    paddingTop: spacing.md, 
+    paddingBottom: spacing.sm, 
+    zIndex: 100 
+  },
+  headerButton: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 1,
+  },
+  content: { 
+    alignItems: 'center', 
+    paddingHorizontal: spacing.lg, 
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    zIndex: 100,
   },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  content: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
-  avatarWrapper: {
-    marginBottom: spacing.md,
-    position: 'relative',
-  },
-  avatarGradient: {
+  avatarWrapper: { marginBottom: spacing.md, position: 'relative' },
+  avatarLoading: {
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 8,
   },
-  avatarLetter: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  editBadge: { 
+    position: 'absolute', 
+    bottom: 0, 
+    right: 0, 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 2,
   },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.background,
+  displayName: { 
+    fontSize: 22, 
+    fontWeight: '600', 
+    marginBottom: 4, 
+    letterSpacing: -0.3 
+  },
+  username: { 
+    fontSize: 15, 
+    fontWeight: '400', 
+    marginBottom: spacing.md 
+  },
+  bio: { 
+    fontSize: typography.fontSize.sm, 
+    textAlign: 'center', 
+    lineHeight: 20, 
+    maxWidth: 280, 
+    marginBottom: spacing.lg 
+  },
+  bioPlaceholder: { 
+    fontSize: typography.fontSize.sm, 
+    textAlign: 'center', 
+    lineHeight: 20, 
+    maxWidth: 280, 
+    marginBottom: spacing.lg, 
+    fontStyle: 'italic' 
+  },
+  followStatsCard: { 
+    flexDirection: 'row', 
+    borderRadius: 20, 
+    padding: spacing.lg, 
+    marginBottom: spacing.xl, 
+    width: '100%', 
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 2,
   },
-  displayName: {
-    fontSize: 22,
+  followStat: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm },
+  followNumber: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  followLabel: { 
+    fontSize: 10, 
+    fontWeight: '600', 
+    letterSpacing: 0.8,
+  },
+  followDivider: { width: 1 },
+  postsSection: { width: '100%', marginTop: spacing.md },
+  postsSectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: spacing.md, 
+    paddingHorizontal: 4 
+  },
+  postsSectionTitle: { 
+    fontSize: 17, 
     fontWeight: '600',
-    color: '#4A4A58',
-    marginBottom: 4,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
-  username: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#8E8E9A',
-    marginBottom: spacing.md,
+  postsCount: { 
+    fontSize: 15, 
+    fontWeight: '600',
   },
-  bio: {
-    fontSize: typography.fontSize.sm,
-    color: '#8E8E9A',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
-    marginBottom: spacing.lg,
-  },
-  bioPlaceholder: {
-    fontSize: typography.fontSize.sm,
-    color: '#B8B8C8',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
-    marginBottom: spacing.lg,
-    fontStyle: 'italic',
-  },
-  followStatsCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 20,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
-    width: '100%',
+  postCard: { 
+    borderRadius: 20, 
+    padding: spacing.lg, 
+    marginBottom: spacing.md, 
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 3,
+    elevation: 2,
   },
-  followStat: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
+  postReview: { 
+    fontSize: typography.fontSize.sm, 
+    lineHeight: 20, 
+    marginBottom: spacing.sm 
   },
-  followNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4A4A58',
-    marginBottom: 4,
+  postRating: { flexDirection: 'row', gap: 2, marginBottom: spacing.sm },
+  postMeta: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
   },
-  followLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#8E8E9A',
-    letterSpacing: 0.5,
+  postMediaTitle: { 
+    fontSize: typography.fontSize.xs, 
+    fontWeight: '600', 
+    flex: 1 
   },
-  followDivider: {
-    width: 1,
-    backgroundColor: '#E0E0E0',
-  },
-  postsSection: {
-    width: '100%',
-    marginTop: spacing.md,
-  },
-  postsSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingHorizontal: 4,
-  },
-  postsSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A4A58',
-  },
-  postsCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  postCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-  },
-  postReview: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    lineHeight: 20,
-    marginBottom: spacing.sm,
-  },
-  postRating: {
-    flexDirection: 'row',
-    gap: 2,
-    marginBottom: spacing.sm,
-  },
-  postMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  postMediaTitle: {
+  postTime: { 
     fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    color: colors.primary,
-    flex: 1,
   },
-  postTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
-  },
-  emptyPosts: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    borderRadius: 16,
+  emptyPosts: { 
+    alignItems: 'center', 
+    paddingVertical: spacing.xxl, 
+    borderRadius: 20, 
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  emptyPostsEmoji: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  emptyPostsEmoji: { fontSize: 48, marginBottom: spacing.md },
+  emptyPostsText: { 
+    fontSize: typography.fontSize.md, 
+    fontWeight: '600', 
+    marginBottom: spacing.xs 
   },
-  emptyPostsText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.xs,
+  emptyPostsSubtext: { 
+    fontSize: typography.fontSize.sm, 
+    textAlign: 'center' 
   },
-  emptyPostsSubtext: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-  },
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background,
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: typography.fontSize.md },
+  listHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: spacing.md, 
+    paddingVertical: spacing.md, 
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  listTitle: { fontSize: 18, fontWeight: '600' },
+  searchContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginHorizontal: spacing.md, 
+    marginVertical: spacing.md, 
+    borderRadius: 12, 
+    paddingHorizontal: spacing.md 
   },
-  listTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.md,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-  },
-  searchIcon: {
-    marginRight: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: spacing.md,
+  searchIcon: { marginRight: spacing.sm },
+  searchInput: { 
+    flex: 1, 
+    paddingVertical: spacing.md, 
     fontSize: typography.fontSize.md,
-    color: colors.text,
   },
-  userList: {
-    padding: spacing.md,
-  },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    padding: spacing.md,
+  userList: { padding: spacing.md },
+  userCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderRadius: 16, 
+    padding: spacing.lg, 
     marginBottom: spacing.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  userInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  userName: {
-    fontSize: typography.fontSize.md,
+  userInfo: { flex: 1, marginLeft: spacing.md },
+  userName: { 
+    fontSize: typography.fontSize.md, 
     fontWeight: '600',
-    color: colors.text,
   },
-  userUsername: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginTop: 2,
+  userUsername: { 
+    fontSize: typography.fontSize.sm, 
+    marginTop: 2 
   },
-  emptyUsers: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  emptyUsersText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-  },
+  emptyUsers: { alignItems: 'center', paddingVertical: spacing.xxl },
+  emptyUsersText: { fontSize: typography.fontSize.md },
 });

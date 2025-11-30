@@ -3,18 +3,20 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AppNavigator } from './src/navigation';
-import { useAuthStore } from './src/store';
+import { useAuthStore, useThemeStore } from './src/store';
 import { authService } from './src/services/supabase/auth.service';
 import { supabase } from './src/services/supabase/supabase.client';
-import { colors } from './src/theme';
+import { useTheme } from './src/hooks/useTheme';
 
 export default function App() {
   const { setUser, setLoading } = useAuthStore();
+  const { loadTheme } = useThemeStore();
+  const { colors, isDark } = useTheme();
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    checkAuthState();
+    // Initialize app
+    initializeApp();
 
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -42,9 +44,14 @@ export default function App() {
     };
   }, []);
 
-  const checkAuthState = async () => {
+  const initializeApp = async () => {
     try {
       setLoading(true);
+      
+      // Load theme from storage
+      await loadTheme();
+      
+      // Check auth state
       const user = await authService.getCurrentUser();
       
       if (user) {
@@ -71,7 +78,7 @@ export default function App() {
   // Show loading screen while checking auth
   if (initializing) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -80,7 +87,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppNavigator />
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? "light" : "auto"} />
     </SafeAreaProvider>
   );
 }
@@ -90,6 +97,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
 });

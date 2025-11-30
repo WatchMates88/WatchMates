@@ -6,15 +6,17 @@ import { RootStackParamList, Collection, CollectionItem, Movie, TVShow } from '.
 import { PosterGrid } from '../../components/media/PosterGrid';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { UserAvatar } from '../../components/user/UserAvatar';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 import { collectionsService } from '../../services/supabase/collections.service';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { useAuthStore } from '../../store';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollectionDetail'>;
 
 export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { collectionId } = route.params;
+  const { colors } = useTheme();
   const { user } = useAuthStore();
   
   const [collection, setCollection] = useState<Collection | null>(null);
@@ -30,10 +32,8 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
     try {
       setLoading(true);
       
-      // Get collection items
       const collectionItems = await collectionsService.getCollectionItems(collectionId);
       
-      // Fetch TMDB details
       const mediaPromises = collectionItems.map(async (item: CollectionItem) => {
         try {
           if (item.media_type === 'movie') {
@@ -49,7 +49,6 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
       const mediaDetails = await Promise.all(mediaPromises);
       setItems(mediaDetails.filter(m => m !== null));
       
-      // Get collaborators if collaborative
       const collabs = await collectionsService.getCollaborators(collectionId);
       setCollaborators(collabs);
       
@@ -125,21 +124,35 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header Actions */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-          <Ionicons name="share-outline" size={22} color={colors.text} />
+        <TouchableOpacity 
+          style={[styles.headerButton, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]} 
+          onPress={handleShare}
+        >
+          <Ionicons name="share-outline" size={22} color={colors.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton} onPress={handleOptions}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
+        <TouchableOpacity 
+          style={[styles.headerButton, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]} 
+          onPress={handleOptions}
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
         </TouchableOpacity>
       </View>
 
       {/* Collaborators */}
       {collaborators.length > 0 && (
         <View style={styles.collaboratorsSection}>
-          <Text style={styles.collaboratorsLabel}>SHARED WITH</Text>
+          <Text style={[styles.collaboratorsLabel, { color: colors.textTertiary }]}>
+            SHARED WITH
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.collaboratorsList}>
               {collaborators.map((collab) => (
@@ -147,11 +160,16 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
                   <UserAvatar
                     avatarUrl={collab.avatar_url}
                     username={collab.username}
-                    size={32}
+                    size={36}
                   />
                 </View>
               ))}
-              <TouchableOpacity style={styles.addCollaborator}>
+              <TouchableOpacity 
+                style={[styles.addCollaborator, {
+                  backgroundColor: colors.primary + '20',
+                  borderColor: colors.primary + '30',
+                }]}
+              >
                 <Ionicons name="add" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
@@ -168,8 +186,8 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyText}>No items yet</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, { color: colors.text }]}>No items yet</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
             Add movies and shows from their detail pages!
           </Text>
         </View>
@@ -181,48 +199,52 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.backgroundSecondary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   collaboratorsSection: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingBottom: spacing.lg,
   },
   collaboratorsLabel: {
     fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    letterSpacing: 1,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     marginBottom: spacing.sm,
   },
   collaboratorsList: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
+    alignItems: 'center',
   },
   collaboratorItem: {
     alignItems: 'center',
   },
   addCollaborator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary + '20',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   emptyContainer: {
     flex: 1,
@@ -237,12 +259,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
-    color: colors.text,
     marginBottom: spacing.xs,
+    letterSpacing: -0.3,
   },
   emptySubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 20,
   },
 });

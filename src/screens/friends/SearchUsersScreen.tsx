@@ -7,13 +7,15 @@ import { SearchBar } from '../../components/search/SearchBar';
 import { UserAvatar } from '../../components/user/UserAvatar';
 import { FollowButton } from '../../components/user/FollowButton';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 import { friendsService } from '../../services/supabase/friends.service';
 import { useAuthStore } from '../../store';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SearchUsers'>;
 
 export const SearchUsersScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -34,11 +36,9 @@ export const SearchUsersScreen: React.FC<Props> = ({ navigation }) => {
           setLoading(true);
           const results = await friendsService.searchProfiles(text);
           
-          // Filter out current user
           const filtered = results.filter(r => r.id !== user?.id);
           setSearchResults(filtered);
           
-          // Check which users we're following
           if (user) {
             const following = await friendsService.getFollowing(user.id);
             const followingSet = new Set(following.map(f => f.id));
@@ -98,7 +98,10 @@ export const SearchUsersScreen: React.FC<Props> = ({ navigation }) => {
           data={searchResults}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.userCard}
+              style={[styles.userCard, {
+                backgroundColor: colors.card,
+                borderColor: colors.cardBorder,
+              }]}
               onPress={() => handleUserPress(item)}
               activeOpacity={0.7}
             >
@@ -106,13 +109,19 @@ export const SearchUsersScreen: React.FC<Props> = ({ navigation }) => {
                 <UserAvatar
                   avatarUrl={item.avatar_url}
                   username={item.username}
-                  size={48}
+                  size={52}
                 />
                 <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{item.full_name || item.username}</Text>
-                  <Text style={styles.userUsername}>@{item.username}</Text>
+                  <Text style={[styles.userName, { color: colors.text }]}>
+                    {item.full_name || item.username}
+                  </Text>
+                  <Text style={[styles.userUsername, { color: colors.textSecondary }]}>
+                    @{item.username}
+                  </Text>
                   {item.bio && (
-                    <Text style={styles.userBio} numberOfLines={1}>{item.bio}</Text>
+                    <Text style={[styles.userBio, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {item.bio}
+                    </Text>
                   )}
                 </View>
               </View>
@@ -124,14 +133,21 @@ export const SearchUsersScreen: React.FC<Props> = ({ navigation }) => {
           )}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: spacing.xl }}
           ListEmptyComponent={
             searchQuery.length > 2 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No users found</Text>
+                <Text style={styles.emptyEmoji}>🔍</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  No users found
+                </Text>
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Search for users by username</Text>
+                <Text style={styles.emptyEmoji}>👥</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  Search for users by username
+                </Text>
               </View>
             )
           }
@@ -146,15 +162,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
+    padding: spacing.lg,
+    borderRadius: 20,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: spacing.md,
   },
   userDetails: {
     marginLeft: spacing.md,
@@ -162,26 +184,29 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   userUsername: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
     marginTop: 2,
   },
   userBio: {
     fontSize: typography.fontSize.xs,
-    color: colors.textTertiary,
     marginTop: 4,
+    lineHeight: 16,
   },
   emptyContainer: {
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.lg,
   },
   emptyText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

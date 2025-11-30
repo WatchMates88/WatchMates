@@ -8,12 +8,14 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { SegmentedControl } from '../../components/common/SegmentedControl';
 import { spacing } from '../../theme';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   navigation: any;
 };
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [selectedTab, setSelectedTab] = useState<'movies' | 'tv'>('movies');
   const [movies, setMovies] = useState<Movie[]>([]);
   const [tvShows, setTVShows] = useState<TVShow[]>([]);
@@ -55,24 +57,26 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <Container style={styles.container}>
-      <PosterGrid
-        data={data}
-        onItemPress={handleItemPress}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.toggleWrapper}>
-              <SegmentedControl
-                segments={['Movies', 'TV Shows']}
-                selectedIndex={selectedTab === 'movies' ? 0 : 1}
-                onChange={(index) => setSelectedTab(index === 0 ? 'movies' : 'tv')}
-              />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Container style={styles.container}>
+        <PosterGrid
+          data={data}
+          onItemPress={handleItemPress}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.toggleWrapper}>
+                <SegmentedControl
+                  segments={['Movies', 'TV Shows']}
+                  selectedIndex={selectedTab === 'movies' ? 0 : 1}
+                  onChange={(index) => setSelectedTab(index === 0 ? 'movies' : 'tv')}
+                />
+              </View>
+              <SectionHeader title="Trending" />
             </View>
-            <SectionHeader title="Trending" />
-          </View>
-        }
-      />
-    </Container>
+          }
+        />
+      </Container>
+    </View>
   );
 };
 

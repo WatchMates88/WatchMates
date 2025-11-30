@@ -1,26 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
+  Alert,
+  TextInput,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from '../../components/user/UserAvatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { colors, spacing, typography } from '../../theme';
-import { usePostsStore } from '../../store';
-import { useAuthStore } from '../../store';
-import { Post } from '../../types';
+import { spacing, typography } from '../../theme';
+import { usePostsStore, useAuthStore, useCommentsStore } from '../../store';
+import { tmdbService } from '../../services/tmdb/tmdb.service';
+import { Post, Movie, TVShow } from '../../types';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = {
   navigation: any;
 };
 
 export const FeedScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
   const { user } = useAuthStore();
-  const { posts, isLoading, fetchFeed, toggleLike } = usePostsStore();
+  const { posts, isLoading, fetchFeed, toggleLike, deletePostById } = usePostsStore();
+  const { getCommentsForPost } = useCommentsStore();
+
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<(Movie | TVShow)[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadFeed();
-    }
+    if (user) loadFeed();
   }, [user]);
 
   const loadFeed = async () => {
@@ -40,12 +55,65 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleComment = (postId: string) => {
-    Alert.alert('Coming Soon', 'Comments feature coming soon!');
+    navigation.navigate('PostDetail', { postId });
   };
 
+  const handlePostPress = (postId: string) => {
+    navigation.navigate('PostDetail', { postId });
+  };
+
+  const handlePostOptions = (post: Post) => {
+    const isOwner = post.user_id === user?.id;
+    if (!isOwner) return;
+
+    Alert.alert('Post Options', '', [
+      {
+        text: 'Edit',
+        onPress: () => {
+          navigation.navigate('CreatePost', {
+            movieId: post.media_id,
+            mediaType: post.media_type,
+            title: post.media_title,
+            poster: post.media_poster,
+            editPostId: post.id,
+            existingText: post.review_text,
+            existingRating: post.rating,
+          });
+        },
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete Post',
+            'Are you sure you want to delete this post?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await deletePostById(post.id);
+                    Alert.alert('Success', 'Post deleted');
+                  } catch (error) {
+                    Alert.alert('Error', 'Failed to delete post');
+                  }
+                },
+              },
+            ]
+          );
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  // 🔥 FIXED HERE — navigating to your own Profile
   const handleUserPress = (userId: string) => {
     if (userId === user?.id) {
-      navigation.navigate('Profile');
+      navigation.navigate('MainTabs', { screen: 'Profile' });
     } else {
       navigation.navigate('FriendProfile', { userId });
     }
@@ -59,402 +127,446 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleCreatePost = () => {
-    Alert.alert(
-      'Create Post',
-      'Please go to a movie or show detail page and click the "Review" button to create a post!'
-    );
+  const handleSearch = async (text: string) => {
+    setSearchQuery(text);
+
+    if (text.length > 2) {
+      try {
+        setSearching(true);
+        const [movies, shows] = await Promise.all([
+          tmdbService.searchMovies(text),
+          tmdbService.searchTVShows(text),
+        ]);
+        setSearchResults([...movies, ...shows]);
+      } finally {
+        setSearching(false);
+      }
+    } else {
+      setSearchResults([]);
+    }
   };
 
-  const formatTimeAgo = (dateString: string): string => {
+  const handleSelectMedia = (item: Movie | TVShow) => {
+    const title = 'title' in item ? item.title : item.name;
+    const mediaType = 'title' in item ? 'movie' : 'tv';
+
+    navigation.navigate('CreatePost', {
+      movieId: item.id,
+      mediaType,
+      title,
+      poster: item.poster_path,
+    });
+
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // 🔥 Clicking + → go to CreatePost
+  const handleCreatePost = () => {
+    navigation.navigate('CreatePost', {
+      movieId: 0,
+      mediaType: 'movie',
+      title: '',
+      poster: null,
+    });
+  };
+
+  const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return `${Math.floor(seconds / 604800)}w ago`;
+    if (seconds < 60) return 'now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+    return `${Math.floor(seconds / 604800)}w`;
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <View style={styles.postCard}>
-      {/* User Header */}
-      <TouchableOpacity
-        style={styles.postHeader}
-        onPress={() => handleUserPress(item.user_id)}
-        activeOpacity={0.7}
-      >
-        <UserAvatar
-          avatarUrl={item.profile?.avatar_url}
-          username={item.profile?.username || 'User'}
-          size={44}
-        />
-        <View style={styles.postHeaderText}>
-          <Text style={styles.postUsername}>
-            {item.profile?.full_name || item.profile?.username}
-          </Text>
-          <Text style={styles.postTime}>{formatTimeAgo(item.created_at)}</Text>
-        </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </TouchableOpacity>
+  const renderPost = ({ item }: { item: Post }) => {
+    const isOwner = item.user_id === user?.id;
+    const commentCount = getCommentsForPost(item.id).length;
 
-      {/* Review Text */}
-      <Text style={styles.reviewText}>{item.review_text}</Text>
-
-      {/* Rating Stars */}
-      {item.rating && (
-        <View style={styles.ratingContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Ionicons
-              key={star}
-              name={star <= item.rating! ? 'star' : 'star-outline'}
-              size={18}
-              color="#FFD700"
+    return (
+      <View style={styles.threadPost}>
+        {/* Header */}
+        <View style={styles.threadHeader}>
+          <TouchableOpacity onPress={() => handleUserPress(item.user_id)}>
+            <UserAvatar
+              avatarUrl={item.profile?.avatar_url}
+              username={item.profile?.username || 'User'}
+              size={40}
             />
-          ))}
-          <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-        </View>
-      )}
+          </TouchableOpacity>
 
-      {/* Movie/Show Card with Poster */}
-      <TouchableOpacity
-        style={styles.mediaCard}
-        onPress={() => handleMediaPress(item)}
-        activeOpacity={0.7}
-      >
-        {item.media_poster ? (
-          <Image
-            source={{ uri: `https://image.tmdb.org/t/p/w342${item.media_poster}` }}
-            style={styles.mediaPoster}
-          />
-        ) : (
-          <View style={styles.mediaPosterPlaceholder}>
-            <Ionicons name="film-outline" size={32} color={colors.textTertiary} />
-          </View>
-        )}
-        <View style={styles.mediaInfo}>
-          <View style={styles.mediaTypeTag}>
-            <Ionicons 
-              name={item.media_type === 'movie' ? 'film-outline' : 'tv-outline'} 
-              size={12} 
-              color={colors.primary} 
-            />
-            <Text style={styles.mediaTypeText}>
-              {item.media_type === 'movie' ? 'MOVIE' : 'TV SHOW'}
+          <View style={styles.threadHeaderText}>
+            <TouchableOpacity onPress={() => handleUserPress(item.user_id)}>
+              <Text style={[styles.threadUsername, { color: colors.text }]}>
+                {item.profile?.full_name || item.profile?.username}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.threadTime, { color: colors.textTertiary }]}>
+              {formatTimeAgo(item.created_at)}
             </Text>
           </View>
-          <Text style={styles.mediaTitle} numberOfLines={2}>
-            {item.media_title}
-          </Text>
-          <View style={styles.viewDetailsButton}>
-            <Text style={styles.viewDetailsText}>View Details</Text>
-            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
-          </View>
+
+          {isOwner && (
+            <TouchableOpacity
+              onPress={() => handlePostOptions(item)}
+              style={styles.optionsButton}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.iconInactive} />
+            </TouchableOpacity>
+          )}
         </View>
-      </TouchableOpacity>
 
-      {/* Action Buttons */}
-      <View style={styles.postActions}>
+        {/* Review */}
+        <Text style={[styles.threadReview, { color: colors.text }]}>
+          {item.review_text}
+        </Text>
+
+        {/* Rating */}
+        {item.rating && (
+          <View style={styles.threadRating}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Ionicons
+                key={star}
+                name={star <= item.rating! ? 'star' : 'star-outline'}
+                size={16}
+                color="#FFD700"
+              />
+            ))}
+            <Text style={styles.threadRatingText}>{item.rating.toFixed(1)}</Text>
+          </View>
+        )}
+
+        {/* Media */}
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleLike(item.id)}
-          activeOpacity={0.7}
+          style={styles.threadMedia}
+          onPress={() => handleMediaPress(item)}
         >
-          <Ionicons
-            name={item.is_liked ? 'heart' : 'heart-outline'}
-            size={22}
-            color={item.is_liked ? '#FF6B6B' : colors.textSecondary}
-          />
-          <Text style={[styles.actionText, item.is_liked && styles.actionTextLiked]}>
-            {item.like_count || 0}
-          </Text>
+          {item.media_poster ? (
+            <Image
+              source={{ uri: `https://image.tmdb.org/t/p/w342${item.media_poster}` }}
+              style={styles.threadPoster}
+            />
+          ) : (
+            <View style={[styles.threadPosterPlaceholder, { backgroundColor: colors.card }]}>
+              <Ionicons name="film-outline" size={24} color={colors.textTertiary} />
+            </View>
+          )}
+
+          <View style={styles.threadMediaInfo}>
+            <Text style={[styles.threadMediaTitle, { color: colors.text }]}>
+              {item.media_title}
+            </Text>
+
+            <Text style={[styles.threadMediaType, { color: colors.textTertiary }]}>
+              {item.media_type === 'movie' ? 'Movie' : 'TV Show'}
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleComment(item.id)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
-          <Text style={styles.actionText}>0</Text>
-        </TouchableOpacity>
+        {/* Actions */}
+        <View style={styles.threadActions}>
+          <TouchableOpacity
+            style={styles.threadActionButton}
+            onPress={() => handleLike(item.id)}
+          >
+            <Ionicons
+              name={item.is_liked ? 'heart' : 'heart-outline'}
+              size={20}
+              color={item.is_liked ? '#FF6B6B' : colors.iconInactive}
+            />
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
+            {(item.like_count ?? 0) > 0 && (
+              <Text
+                style={[
+                  styles.threadActionCount,
+                  { color: item.is_liked ? '#FF6B6B' : colors.textTertiary },
+                ]}
+              >
+                {item.like_count ?? 0}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.threadActionButton}
+            onPress={() => handleComment(item.id)}
+          >
+            <Ionicons name="chatbubble-outline" size={20} color={colors.iconInactive} />
+
+            {commentCount > 0 && (
+              <Text style={[styles.threadActionCount, { color: colors.textTertiary }]}>
+                {commentCount}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.threadActionButton}>
+            <Ionicons name="paper-plane-outline" size={20} color={colors.iconInactive} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Divider */}
+        <View style={[styles.threadDivider, { backgroundColor: colors.border }]} />
       </View>
-    </View>
-  );
+    );
+  };
+
+  const renderSearchResult = ({ item }: { item: Movie | TVShow }) => {
+    const title = 'title' in item ? item.title : item.name;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.searchResultCard,
+          { backgroundColor: colors.card, borderColor: colors.cardBorder },
+        ]}
+        onPress={() => handleSelectMedia(item)}
+      >
+        {item.poster_path ? (
+          <Image
+            source={{ uri: `https://image.tmdb.org/t/p/w92${item.poster_path}` }}
+            style={styles.searchPoster}
+          />
+        ) : (
+          <View style={[styles.searchPosterPlaceholder, { backgroundColor: colors.card }]} />
+        )}
+
+        <View style={styles.searchInfo}>
+          <Text style={[styles.searchTitle, { color: colors.text }]} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={[styles.searchType, { color: colors.textSecondary }]}>
+            {'title' in item ? 'Movie' : 'TV Show'}
+          </Text>
+        </View>
+
+        <Ionicons name="add-circle" size={24} color={colors.primary} />
+      </TouchableOpacity>
+    );
+  };
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Please login to view feed</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Please login to view feed
+          </Text>
         </View>
       </View>
     );
   }
 
-  if (isLoading && posts.length === 0) {
-    return <LoadingSpinner />;
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={posts}
-        renderItem={renderPost}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.feedList}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyFeed}>
-            <Text style={styles.emptyFeedEmoji}>🎬</Text>
-            <Text style={styles.emptyFeedText}>No posts yet</Text>
-            <Text style={styles.emptyFeedSubtext}>
-              Follow friends to see their reviews, or create your first post!
-            </Text>
-            <TouchableOpacity 
-              style={styles.emptyFeedButton}
-              onPress={handleCreatePost}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.emptyFeedButtonText}>Create Your First Review</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.inputBackground }]}>
+        <Ionicons name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
 
-      {/* Floating Create Post Button */}
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search movies, shows..."
+          placeholderTextColor={colors.textTertiary}
+          value={searchQuery}
+          onChangeText={handleSearch}
+        />
+      </View>
+
+      {/* Search Results */}
+      {searchResults.length > 0 ? (
+        <FlatList
+          data={searchResults}
+          renderItem={renderSearchResult}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.searchResults}
+        />
+      ) : (
+        <>
+          {isLoading && posts.length === 0 ? (
+            <LoadingSpinner />
+          ) : (
+            <FlatList
+              data={posts}
+              renderItem={renderPost}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.threadFeed}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.primary}
+                />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyFeed}>
+                  <Text style={styles.emptyFeedEmoji}>🎬</Text>
+
+                  <Text style={[styles.emptyFeedText, { color: colors.text }]}>
+                    No posts yet
+                  </Text>
+
+                  <Text style={[styles.emptyFeedSubtext, { color: colors.textSecondary }]}>
+                    Search for a movie above to create your first review!
+                  </Text>
+                </View>
+              }
+            />
+          )}
+        </>
+      )}
+
+      {/* FAB */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[
+          styles.createButton,
+          { backgroundColor: colors.primary, shadowColor: colors.primary },
+        ]}
         onPress={handleCreatePost}
-        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
+        <Ionicons name="add" size={28} color="#FFF" />
       </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1 },
+
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    height: 44,
   },
-  feedList: {
+  searchIcon: { marginRight: spacing.sm },
+  searchInput: { flex: 1, fontSize: typography.fontSize.md },
+  searchResults: { padding: spacing.md },
+  searchResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
     padding: spacing.md,
-    paddingBottom: 100,
-  },
-  postCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
   },
-  postHeader: {
+  searchPoster: { width: 40, height: 60, borderRadius: 6 },
+  searchPosterPlaceholder: { width: 40, height: 60, borderRadius: 6 },
+  searchInfo: { flex: 1, marginLeft: spacing.md },
+  searchTitle: { fontSize: typography.fontSize.sm, fontWeight: '600' },
+  searchType: { fontSize: typography.fontSize.xs },
+
+  // Thread feed
+  threadFeed: { paddingBottom: 100 },
+
+  threadPost: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  threadHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  postHeaderText: {
-    marginLeft: spacing.sm,
+  threadHeaderText: {
+    marginLeft: spacing.md,
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  postUsername: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
-  },
-  postTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  moreButton: {
-    padding: spacing.xs,
-  },
-  reviewText: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
+  optionsButton: { padding: spacing.xs },
+  threadUsername: { fontSize: 15, fontWeight: '600', letterSpacing: -0.2 },
+  threadTime: { fontSize: 14 },
+
+  threadReview: {
+    fontSize: 15,
     lineHeight: 22,
     marginBottom: spacing.md,
   },
-  ratingContainer: {
+
+  threadRating: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: spacing.md,
   },
-  ratingText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-    color: '#FFD700',
-    marginLeft: spacing.xs,
-  },
-  mediaCard: {
+  threadRatingText: { fontSize: 13, fontWeight: '600', color: '#FFD700', marginLeft: 4 },
+
+  threadMedia: {
     flexDirection: 'row',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  mediaPoster: {
-    width: 80,
-    height: 120,
-    borderRadius: 12,
-    backgroundColor: colors.backgroundTertiary,
-  },
-  mediaPosterPlaceholder: {
-    width: 80,
-    height: 120,
-    borderRadius: 12,
-    backgroundColor: colors.backgroundTertiary,
+  threadPoster: { width: 60, height: 90, borderRadius: 8 },
+  threadPosterPlaceholder: {
+    width: 60,
+    height: 90,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mediaInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-  },
-  mediaTypeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '15',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  mediaTypeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: 0.5,
-  },
-  mediaTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
-    marginTop: spacing.xs,
-  },
-  viewDetailsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: spacing.xs,
-  },
-  viewDetailsText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  postActions: {
+  threadMediaInfo: { flex: 1, marginLeft: spacing.md, justifyContent: 'center' },
+  threadMediaTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  threadMediaType: { fontSize: 12, fontWeight: '500' },
+
+  threadActions: {
     flexDirection: 'row',
     gap: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
   },
-  actionButton: {
+  threadActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  actionText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: typography.fontWeight.medium,
+  threadActionCount: { fontSize: 13, fontWeight: '500' },
+
+  threadDivider: {
+    height: 1,
+    marginTop: spacing.lg,
+    opacity: 0.3,
   },
-  actionTextLiked: {
-    color: '#FF6B6B',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-  },
+
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: typography.fontSize.md },
+
   emptyFeed: {
     alignItems: 'center',
     paddingTop: 100,
     paddingHorizontal: spacing.xl,
   },
-  emptyFeedEmoji: {
-    fontSize: 64,
-    marginBottom: spacing.lg,
-  },
-  emptyFeedText: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  emptyFeedSubtext: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.xl,
-  },
-  emptyFeedButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 16,
-    shadowColor: colors.primary,
+  emptyFeedEmoji: { fontSize: 64, marginBottom: spacing.lg },
+  emptyFeedText: { fontSize: typography.fontSize.xl, fontWeight: '700', marginBottom: spacing.sm },
+  emptyFeedSubtext: { fontSize: typography.fontSize.sm, textAlign: 'center', lineHeight: 20 },
+
+  createButton: {
+    position: 'absolute',
+    bottom: 90,
+    right: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  emptyFeedButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
+    shadowOpacity: 0.36,
+    shadowRadius: 16,
+    elevation: 12,
   },
 });

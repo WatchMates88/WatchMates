@@ -1,8 +1,7 @@
 import { supabase } from './supabase.client';
-import { Post, PostLike } from '../../types';
+import { Post } from '../../types';
 
 export const postsService = {
-  // Create a new post
   createPost: async (
     userId: string,
     mediaId: number,
@@ -30,24 +29,59 @@ export const postsService = {
     return data;
   },
 
-  // Get feed (posts from users you follow + your own)
+  // NEW: Update post
+  updatePost: async (
+    postId: string,
+    reviewText: string,
+    rating: number | null
+  ): Promise<Post> => {
+    const { data, error } = await supabase
+      .from('posts')
+      .update({
+        review_text: reviewText,
+        rating,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
   getFeed: async (userId: string, limit: number = 20, offset: number = 0): Promise<Post[]> => {
     const { data, error } = await supabase
       .from('posts')
       .select(`
         *,
-        profile:profiles!posts_user_id_fkey(username, full_name, avatar_url),
-        like_count:post_likes(count),
-        is_liked:post_likes!inner(user_id)
+        profile:profiles!posts_user_id_fkey(username, full_name, avatar_url)
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     
     if (error) throw error;
-    return data || [];
+    
+    if (data) {
+      const postsWithLikes = await Promise.all(
+        data.map(async (post) => {
+          const likeCount = await postsService.getLikeCount(post.id);
+          const isLiked = await postsService.isPostLiked(userId, post.id);
+          
+          return {
+            ...post,
+            like_count: likeCount,
+            is_liked: isLiked,
+          };
+        })
+      );
+      
+      return postsWithLikes;
+    }
+    
+    return [];
   },
 
-  // Get user's posts
   getUserPosts: async (userId: string): Promise<Post[]> => {
     const { data, error } = await supabase
       .from('posts')
@@ -62,7 +96,6 @@ export const postsService = {
     return data || [];
   },
 
-  // Delete post
   deletePost: async (postId: string) => {
     const { error } = await supabase
       .from('posts')
@@ -72,7 +105,6 @@ export const postsService = {
     if (error) throw error;
   },
 
-  // Like a post
   likePost: async (userId: string, postId: string) => {
     const { data, error } = await supabase
       .from('post_likes')
@@ -87,7 +119,6 @@ export const postsService = {
     return data;
   },
 
-  // Unlike a post
   unlikePost: async (userId: string, postId: string) => {
     const { error } = await supabase
       .from('post_likes')
@@ -98,7 +129,6 @@ export const postsService = {
     if (error) throw error;
   },
 
-  // Check if user liked a post
   isPostLiked: async (userId: string, postId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('post_likes')
@@ -111,7 +141,6 @@ export const postsService = {
     return !!data;
   },
 
-  // Get like count for a post
   getLikeCount: async (postId: string): Promise<number> => {
     const { count, error } = await supabase
       .from('post_likes')

@@ -1,64 +1,96 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../types';
+import { spacing, typography } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Content */}
       <View style={styles.content}>
-        {/* Icon - Soft Pastel Circle */}
-        <View style={styles.iconContainer}>
+        {/* Icon - Premium circular design */}
+        <View style={[styles.iconContainer, {
+          backgroundColor: isDark ? colors.backgroundSecondary : '#F3F0FF',
+          shadowColor: colors.primary,
+        }]}>
           <Text style={styles.iconEmoji}>🎬</Text>
         </View>
 
-        {/* App Name */}
+        {/* App Name - Premium typography */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logoWatch}>Watch</Text>
-          <Text style={styles.logoMates}>Mates</Text>
-          <View style={styles.logoDot} />
+          <Text style={[styles.logoWatch, { color: colors.text }]}>Watch</Text>
+          <Text style={[styles.logoMates, { color: colors.primary }]}>Mates</Text>
+          <View style={[styles.logoDot, { backgroundColor: colors.secondary }]} />
         </View>
 
         {/* Subtitles */}
-        <Text style={styles.subtitle}>Your personal movie tracker.</Text>
-        <Text style={styles.description}>Simple. Social. Cinema.</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Your personal movie tracker.
+        </Text>
+        <Text style={[styles.description, { color: colors.textTertiary }]}>
+          Simple. Social. Cinema.
+        </Text>
 
-        {/* Feature Pills */}
+        {/* Feature Pills - Premium cards */}
         <View style={styles.featuresContainer}>
-          <View style={styles.featurePill}>
+          <View style={[styles.featurePill, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
             <Text style={styles.featureEmoji}>📝</Text>
-            <Text style={styles.featureText}>Track Watchlist</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>Track Watchlist</Text>
           </View>
-          <View style={styles.featurePill}>
+          <View style={[styles.featurePill, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
             <Text style={styles.featureEmoji}>👥</Text>
-            <Text style={styles.featureText}>Connect Friends</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>Connect Friends</Text>
           </View>
-          <View style={styles.featurePill}>
+          <View style={[styles.featurePill, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
             <Text style={styles.featureEmoji}>⭐</Text>
-            <Text style={styles.featureText}>Rate & Review</Text>
+            <Text style={[styles.featureText, { color: colors.text }]}>Rate & Review</Text>
           </View>
         </View>
       </View>
 
-      {/* Buttons */}
+      {/* Buttons - Premium style */}
       <View style={styles.buttonsContainer}>
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => navigation.navigate('Signup')}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryActive]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            <Text style={styles.primaryButtonText}>Get Started</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.secondaryButton}
+          style={[styles.secondaryButton, {
+            borderColor: colors.border,
+          }]}
           onPress={() => navigation.navigate('Login')}
           activeOpacity={0.8}
         >
-          <Text style={styles.secondaryButtonText}>I Already Have an Account</Text>
+          <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
+            I Already Have an Account
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -68,7 +100,6 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFBFD',
     justifyContent: 'space-between',
   },
   content: {
@@ -81,15 +112,13 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#F3F0FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 48,
-    shadowColor: '#B8A4D4',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 6,
   },
   iconEmoji: {
     fontSize: 56,
@@ -100,96 +129,95 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logoWatch: {
-    fontSize: 40,
+    fontSize: 42,
     fontWeight: '800',
-    letterSpacing: -1,
-    color: '#1A1A2E',
+    letterSpacing: -1.5,
   },
   logoMates: {
-    fontSize: 40,
+    fontSize: 42,
     fontWeight: '800',
-    letterSpacing: -1,
-    color: '#B8A4D4',
+    letterSpacing: -1.5,
   },
   logoDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#00F0FF',
     marginLeft: 4,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 18,
-    color: '#6B7280',
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
   description: {
     fontSize: 14,
-    color: '#9CA3AF',
     fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 48,
+    marginBottom: 56,
   },
   featuresContainer: {
     width: '100%',
-    gap: 16,
+    gap: 14,
   },
   featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 24,
-    borderRadius: 16,
+    borderRadius: 20,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
     elevation: 2,
   },
   featureEmoji: {
-    fontSize: 24,
+    fontSize: 26,
     marginRight: 16,
   },
   featureText: {
     fontSize: 16,
-    color: '#4B5563',
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   buttonsContainer: {
     paddingHorizontal: 32,
     paddingBottom: 56,
-    gap: 16,
+    gap: 14,
   },
   primaryButton: {
-    backgroundColor: '#B8A4D4',
-    paddingVertical: 20,
     borderRadius: 20,
-    alignItems: 'center',
-    shadowColor: '#B8A4D4',
-    shadowOffset: { width: 0, height: 8 },
+    overflow: 'hidden',
+    shadowColor: '#8B5CFF',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
   },
+  gradientButton: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   secondaryButton: {
     backgroundColor: 'transparent',
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 20,
     alignItems: 'center',
+    borderWidth: 1,
   },
   secondaryButtonText: {
-    color: '#9CA3AF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

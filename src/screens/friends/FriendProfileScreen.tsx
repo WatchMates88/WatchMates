@@ -4,15 +4,18 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, Profile, Post } from '../../types';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { colors, spacing, typography } from '../../theme';
+import { UserAvatar } from '../../components/user/UserAvatar';
+import { spacing, typography } from '../../theme';
 import { friendsService } from '../../services/supabase/friends.service';
 import { postsService } from '../../services/supabase/posts.service';
 import { useAuthStore } from '../../store';
+import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FriendProfile'>;
 
 export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { userId } = route.params;
+  const { colors } = useTheme();
   const { user: currentUser } = useAuthStore();
   
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -31,17 +34,14 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setLoading(true);
       
-      // Load profile
       const profileData = await friendsService.getProfile(userId);
       setProfile(profileData);
       
-      // Check if following
       if (currentUser) {
         const following = await friendsService.isFollowing(currentUser.id, userId);
         setIsFollowing(following);
       }
       
-      // Load follower/following counts
       const [followers, following] = await Promise.all([
         friendsService.getFollowers(userId),
         friendsService.getFollowing(userId),
@@ -50,7 +50,6 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       setFollowerCount(followers.length);
       setFollowingCount(following.length);
       
-      // Load user's posts (PUBLIC - not watchlist!)
       const posts = await postsService.getUserPosts(userId);
       setUserPosts(posts);
       
@@ -105,11 +104,16 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const renderPost = ({ item }: { item: Post }) => (
     <TouchableOpacity
-      style={styles.postCard}
+      style={[styles.postCard, {
+        backgroundColor: colors.card,
+        borderColor: colors.cardBorder,
+      }]}
       onPress={() => handlePostPress(item)}
       activeOpacity={0.7}
     >
-      <Text style={styles.postReview} numberOfLines={3}>{item.review_text}</Text>
+      <Text style={[styles.postReview, { color: colors.textSecondary }]} numberOfLines={3}>
+        {item.review_text}
+      </Text>
       
       {item.rating && (
         <View style={styles.postRating}>
@@ -125,8 +129,12 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       )}
       
       <View style={styles.postMeta}>
-        <Text style={styles.postMediaTitle} numberOfLines={1}>{item.media_title}</Text>
-        <Text style={styles.postTime}>{formatTimeAgo(item.created_at)}</Text>
+        <Text style={[styles.postMediaTitle, { color: colors.primary }]} numberOfLines={1}>
+          {item.media_title}
+        </Text>
+        <Text style={[styles.postTime, { color: colors.textTertiary }]}>
+          {formatTimeAgo(item.created_at)}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -137,60 +145,77 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (!profile) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Profile not found</Text>
+          <Text style={[styles.errorText, { color: colors.error }]}>Profile not found</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Avatar */}
           <View style={styles.avatarWrapper}>
-            <View style={styles.avatarGradient}>
-              <Text style={styles.avatarLetter}>
-                {(profile.full_name || profile.username).charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            <UserAvatar 
+              avatarUrl={profile.avatar_url} 
+              username={profile.username} 
+              size={100} 
+            />
           </View>
 
           {/* Name */}
-          <Text style={styles.displayName}>
+          <Text style={[styles.displayName, { color: colors.text }]}>
             {profile.full_name || profile.username}
           </Text>
-          <Text style={styles.username}>{profile.username}</Text>
+          <Text style={[styles.username, { color: colors.textSecondary }]}>
+            @{profile.username}
+          </Text>
 
           {/* Bio */}
           {profile.bio && (
-            <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text>
+            <Text style={[styles.bio, { color: colors.textSecondary }]} numberOfLines={3}>
+              {profile.bio}
+            </Text>
           )}
 
-          {/* Follow Stats */}
-          <View style={styles.followStats}>
+          {/* Follow Stats - Premium card */}
+          <View style={[styles.followStats, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
             <View style={styles.followStat}>
-              <Text style={styles.followNumber}>{followerCount}</Text>
-              <Text style={styles.followLabel}>Followers</Text>
+              <Text style={[styles.followNumber, { color: colors.text }]}>{followerCount}</Text>
+              <Text style={[styles.followLabel, { color: colors.textTertiary }]}>Followers</Text>
             </View>
-            <View style={styles.followDivider} />
+            <View style={[styles.followDivider, { backgroundColor: colors.border }]} />
             <View style={styles.followStat}>
-              <Text style={styles.followNumber}>{followingCount}</Text>
-              <Text style={styles.followLabel}>Following</Text>
+              <Text style={[styles.followNumber, { color: colors.text }]}>{followingCount}</Text>
+              <Text style={[styles.followLabel, { color: colors.textTertiary }]}>Following</Text>
             </View>
           </View>
 
-          {/* Follow Button */}
+          {/* Follow Button - Premium */}
           {currentUser && currentUser.id !== profile.id && (
             <TouchableOpacity
-              style={[styles.followButton, isFollowing && styles.followingButton]}
+              style={[
+                styles.followButton,
+                { backgroundColor: isFollowing ? colors.backgroundTertiary : colors.primary },
+                isFollowing && { 
+                  borderWidth: 1,
+                  borderColor: colors.cardBorder,
+                }
+              ]}
               onPress={handleFollowToggle}
               disabled={followLoading}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+              <Text style={[
+                styles.followButtonText,
+                { color: isFollowing ? colors.text : '#FFFFFF' }
+              ]}>
                 {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
               </Text>
             </TouchableOpacity>
@@ -199,8 +224,10 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* Posts Section */}
           <View style={styles.postsSection}>
             <View style={styles.postsSectionHeader}>
-              <Text style={styles.postsSectionTitle}>Reviews</Text>
-              <Text style={styles.postsCount}>{userPosts.length}</Text>
+              <Text style={[styles.postsSectionTitle, { color: colors.text }]}>Reviews</Text>
+              <Text style={[styles.postsCount, { color: colors.textSecondary }]}>
+                {userPosts.length}
+              </Text>
             </View>
 
             {userPosts.length > 0 ? (
@@ -211,9 +238,14 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 scrollEnabled={false}
               />
             ) : (
-              <View style={styles.emptyPosts}>
+              <View style={[styles.emptyPosts, {
+                backgroundColor: colors.card,
+                borderColor: colors.cardBorder,
+              }]}>
                 <Text style={styles.emptyPostsEmoji}>📭</Text>
-                <Text style={styles.emptyPostsText}>No reviews yet</Text>
+                <Text style={[styles.emptyPostsText, { color: colors.text }]}>
+                  No reviews yet
+                </Text>
               </View>
             )}
           </View>
@@ -226,7 +258,6 @@ export const FriendProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     alignItems: 'center',
@@ -235,40 +266,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   avatarWrapper: {
-    marginBottom: spacing.md,
-  },
-  avatarGradient: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  avatarLetter: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    marginBottom: spacing.lg,
   },
   displayName: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#4A4A58',
+    fontSize: 24,
+    fontWeight: '700',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   username: {
     fontSize: 15,
-    color: '#8E8E9A',
-    marginBottom: spacing.md,
+    fontWeight: '500',
+    marginBottom: spacing.lg,
   },
   bio: {
     fontSize: typography.fontSize.sm,
-    color: '#8E8E9A',
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 280,
@@ -276,58 +288,52 @@ const styles = StyleSheet.create({
   },
   followStats: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 16,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: 20,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   followStat: {
     flex: 1,
     alignItems: 'center',
   },
   followNumber: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#4A4A58',
+    marginBottom: 4,
+    letterSpacing: -0.5,
   },
   followLabel: {
-    fontSize: 12,
-    color: '#8E8E9A',
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   followDivider: {
     width: 1,
-    backgroundColor: '#E0E0E0',
   },
   followButton: {
     width: '100%',
-    height: 48,
+    height: 52,
     borderRadius: 16,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xl,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowColor: '#8B5CFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 6,
-  },
-  followingButton: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    elevation: 4,
   },
   followButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  followingButtonText: {
-    color: colors.text,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   postsSection: {
     width: '100%',
@@ -340,26 +346,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   postsSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A4A58',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   postsCount: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.textSecondary,
   },
   postCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    padding: spacing.md,
+    borderRadius: 20,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   postReview: {
     fontSize: typography.fontSize.sm,
-    color: colors.text,
     lineHeight: 20,
     marginBottom: spacing.sm,
   },
@@ -376,16 +383,16 @@ const styles = StyleSheet.create({
   postMediaTitle: {
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
-    color: colors.primary,
     flex: 1,
   },
   postTime: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
   },
   emptyPosts: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   emptyPostsEmoji: {
     fontSize: 48,
@@ -394,7 +401,6 @@ const styles = StyleSheet.create({
   emptyPostsText: {
     fontSize: typography.fontSize.md,
     fontWeight: '600',
-    color: colors.text,
   },
   errorContainer: {
     flex: 1,
@@ -403,6 +409,5 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: typography.fontSize.md,
-    color: colors.error,
   },
 });
