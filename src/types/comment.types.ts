@@ -4,18 +4,27 @@ export interface Comment {
   id: string;
   post_id: string;
   user_id: string;
-  parent_comment_id: string | null;
+
   comment_text: string;
+
+  parent_comment_id?: string | null;
+
+  images?: string[]; // NEW - multiple images for comments
+
   created_at: string;
   updated_at: string;
-  
-  // Joined data
-  profile?: Profile;
-  like_count?: number;
-  is_liked?: boolean;
-  
-  // For nested replies
-  replies?: Comment[];
+
+  like_count?: number; // Optional (depends on query)
+  is_liked?: boolean;  // Optional
+
+  profile?: {
+    id: string;
+    username: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+
+  replies?: Comment[]; // Nested replies
 }
 
 export interface CommentLike {
@@ -30,4 +39,5 @@ export interface CreateCommentInput {
   postId: string;
   commentText: string;
   parentCommentId?: string;
+  images?: string[]; // NEW
 }

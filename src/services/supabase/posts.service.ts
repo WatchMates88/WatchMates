@@ -1,3 +1,5 @@
+// src/services/supabase/posts.service.ts - UPDATED WITH IMAGES
+
 import { supabase } from './supabase.client';
 import { Post } from '../../types';
 
@@ -9,7 +11,8 @@ export const postsService = {
     mediaTitle: string,
     mediaPoster: string | null,
     rating: number | null,
-    reviewText: string
+    reviewText: string,
+    images: string[] = [] // NEW
   ): Promise<Post> => {
     const { data, error } = await supabase
       .from('posts')
@@ -21,6 +24,7 @@ export const postsService = {
         media_poster: mediaPoster,
         rating,
         review_text: reviewText,
+        images, // NEW
       })
       .select()
       .single();
@@ -29,7 +33,6 @@ export const postsService = {
     return data;
   },
 
-  // NEW: Update post
   updatePost: async (
     postId: string,
     reviewText: string,

@@ -1,12 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Image, StyleSheet, Dimensions, View, Text } from 'react-native';
+import { TouchableOpacity, Image, View, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Movie, TVShow } from '../../types';
-import { colors, spacing } from '../../theme';
-import { POSTER_ASPECT_RATIO } from '../../utils/constants';
-
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - spacing.md * 4) / 3;
-const CARD_HEIGHT = CARD_WIDTH / POSTER_ASPECT_RATIO;
 
 interface PosterCardProps {
   item: Movie | TVShow;
@@ -14,19 +9,23 @@ interface PosterCardProps {
 }
 
 export const PosterCard: React.FC<PosterCardProps> = ({ item, onPress }) => {
-  const imageUrl = item.poster_path
-    ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
-    : null;
-
-  const title = 'title' in item ? item.title : item.name;
+  const posterPath = 'poster_path' in item ? item.poster_path : null;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} />
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {posterPath ? (
+        <Image
+          source={{ uri: `https://image.tmdb.org/t/p/w342${posterPath}` }}
+          style={styles.poster}
+          resizeMode="cover"
+        />
       ) : (
-        <View style={[styles.image, styles.placeholder]}>
-          <Text style={styles.placeholderText}>{title}</Text>
+        <View style={[styles.poster, styles.placeholder]}>
+          <Ionicons name="film-outline" size={32} color="#6E6A80" />
         </View>
       )}
     </TouchableOpacity>
@@ -34,24 +33,19 @@ export const PosterCard: React.FC<PosterCardProps> = ({ item, onPress }) => {
 };
 
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    marginBottom: spacing.md,
+  container: {
+    flex: 1,
+    margin: 6,
   },
-  image: {
+  poster: {
     width: '100%',
-    height: CARD_HEIGHT,
-    borderRadius: 8,
-    backgroundColor: colors.backgroundTertiary,
+    aspectRatio: 2 / 3,
+    borderRadius: 12,
+    backgroundColor: '#1A1A20',
   },
   placeholder: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.sm,
-  },
-  placeholderText: {
-    color: colors.textSecondary,
-    textAlign: 'center',
-    fontSize: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
 });

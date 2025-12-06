@@ -1,3 +1,5 @@
+// src/navigation/StackNavigator.tsx - WITH FULLSCREEN IMAGE VIEWER
+
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
@@ -15,6 +17,7 @@ import { SearchUsersScreen } from '../screens/friends/SearchUsersScreen';
 
 import { CreatePostScreen } from '../screens/feed/CreatePostScreen';
 import { PostDetailScreen } from '../screens/feed/PostDetailScreen';
+import { FullScreenImageViewer } from '../screens/feed/FullScreenImageViewer';
 
 import { SettingsScreen } from '../screens/profile/SettingsScreen';
 
@@ -39,6 +42,7 @@ export const StackNavigator = () => {
         headerTitleStyle: { color: colors.text, fontWeight: '600', fontSize: 17 },
         headerTintColor: colors.icon,
         headerShadowVisible: false,
+        animation: 'fade',
       }}
     >
       {!isAuthenticated ? (
@@ -51,15 +55,45 @@ export const StackNavigator = () => {
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} options={{ headerShown: false }} />
 
-          <Stack.Screen name="MovieDetail" component={MovieDetailScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="ShowDetail" component={ShowDetailScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="MovieDetail"
+            component={MovieDetailScreen}
+            options={{
+              headerShown: false,
+              animation: 'fade_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="ShowDetail"
+            component={ShowDetailScreen}
+            options={{
+              headerShown: false,
+              animation: 'fade_from_bottom',
+            }}
+          />
 
           <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ title: 'Profile' }} />
           <Stack.Screen name="SearchUsers" component={SearchUsersScreen} options={{ title: 'Find Friends' }} />
 
-          <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ title: 'Write Review', presentation: 'modal' }} />
+          <Stack.Screen
+            name="CreatePost"
+            component={CreatePostScreen}
+            options={{ title: 'Write Review', presentation: 'modal' }}
+          />
 
           <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
+
+          {/* FullScreen Image Viewer */}
+          <Stack.Screen
+            name="FullScreenImageViewer"
+            component={FullScreenImageViewer}
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
 
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
 

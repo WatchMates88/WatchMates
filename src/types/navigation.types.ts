@@ -1,3 +1,5 @@
+// src/types/navigation.types.ts - COMPLETE WITH IMAGE VIEWER
+
 import { NavigatorScreenParams } from '@react-navigation/native';
 
 export type TabParamList = {
@@ -21,7 +23,6 @@ export type RootStackParamList = {
   FriendProfile: { userId: string };
   SearchUsers: undefined;
 
-  // FIXED: PostDetail must exist here
   PostDetail: { postId: string };
 
   CreatePost: { 
@@ -32,6 +33,12 @@ export type RootStackParamList = {
     editPostId?: string;
     existingText?: string;
     existingRating?: number | null;
+  };
+
+  // NEW: Image Viewer
+  FullScreenImageViewer: {
+    images: string[];
+    index: number;
   };
 
   Settings: undefined;

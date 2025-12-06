@@ -1,188 +1,188 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text, Image, Platform } from 'react-native';
+import { 
+  View, StyleSheet, ScrollView, TouchableOpacity, Text, 
+  TextInput, ActivityIndicator
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Container } from '../../components/layout/Container';
-import { SearchBar } from '../../components/search/SearchBar';
 import { PosterGrid } from '../../components/media/PosterGrid';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { SegmentedControl } from '../../components/common/SegmentedControl';
+import { ContentRow } from '../../components/media/ContentRow';
+import { FilterButton } from '../../components/search/FilterButton';
+import { SortBottomSheet } from '../../components/search/SortBottomSheet';
+import { FilterBottomSheet } from '../../components/search/FilterBottomSheet';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { cacheService } from '../../services/supabase/cache.service';
-import { Movie, TVShow } from '../../types';
-import { spacing, typography } from '../../theme';
+import { filterEngineService } from '../../services/filter/filterEngine.service';
+import { useAuthStore } from '../../store/authStore';
+import { useSearchFilterStore } from '../../store/searchFilterStore';
+import { spacing } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 
-type Props = {
-  navigation: any;
-};
+type Props = { navigation: any };
 
-type SearchMode = 'genre' | 'ott' | 'language';
-
-const INDIAN_OTT_PLATFORMS = [
-  { 
-    id: 8, 
-    name: 'Netflix', 
-    logo: 'https://images.justwatch.com/icon/207360008/s100/netflix.png',
-    gradient: ['#E50914', '#B20710'] 
-  },
-  { 
-    id: 119, 
-    name: 'Prime Video', 
-    logo: 'https://images.justwatch.com/icon/52449861/s100/amazon-prime-video.png',
-    gradient: ['#00A8E1', '#0086B3'] 
-  },
-  { 
-    id: 337, 
-    name: 'Disney+ Hotstar', 
-    logo: 'https://images.justwatch.com/icon/147638351/s100/disney-plus-hotstar.png',
-    gradient: ['#0F298A', '#1A3FB8'] 
-  },
-  { 
-    id: 546, 
-    name: 'Jio Cinema', 
-    logo: 'https://images.justwatch.com/icon/301155241/s100/jiocinema.png',
-    gradient: ['#8031E8', '#A855F7'] 
-  },
-  { 
-    id: 1796, 
-    name: 'SonyLIV', 
-    logo: 'https://images.justwatch.com/icon/301144191/s100/sonyliv.png',
-    gradient: ['#FF6B00', '#FF8C00'] 
-  },
-  { 
-    id: 2049, 
-    name: 'Zee5', 
-    logo: 'https://images.justwatch.com/icon/301558069/s100/zee5.png',
-    gradient: ['#9333EA', '#A855F7'] 
-  },
-  { 
-    id: 1955, 
-    name: 'Apple TV+', 
-    logo: 'https://images.justwatch.com/icon/190848813/s100/apple-tv-plus.png',
-    gradient: ['#000000', '#333333'] 
-  },
-  { 
-    id: 350, 
-    name: 'YouTube', 
-    logo: 'https://images.justwatch.com/icon/59562423/s100/youtube-premium.png',
-    gradient: ['#FF0000', '#CC0000'] 
-  },
-  { 
-    id: 1899, 
-    name: 'Max', 
-    logo: 'https://images.justwatch.com/icon/301683708/s100/max.png',
-    gradient: ['#002BE7', '#0020A8'] 
-  },
-  
-];
-
-const LANGUAGES = [
-  { code: 'en', name: 'English', emoji: '🇺🇸' },
-  { code: 'hi', name: 'Hindi', emoji: '🇮🇳' },
-  { code: 'te', name: 'Telugu', emoji: '🇮🇳' },
-  { code: 'ta', name: 'Tamil', emoji: '🇮🇳' },
-  { code: 'ml', name: 'Malayalam', emoji: '🇮🇳' },
-  { code: 'kn', name: 'Kannada', emoji: '🇮🇳' },
-  { code: 'es', name: 'Spanish', emoji: '🇪🇸' },
-  { code: 'fr', name: 'French', emoji: '🇫🇷' },
-  { code: 'de', name: 'German', emoji: '🇩🇪' },
-  { code: 'ja', name: 'Japanese', emoji: '🇯🇵' },
-  { code: 'ko', name: 'Korean', emoji: '🇰🇷' },
-  { code: 'zh', name: 'Chinese', emoji: '🇨🇳' },
-];
-
-const LANGUAGE_COLOR_GROUPS: Record<string, string[]> = {
-  blue: ['en', 'fr', 'ko', 'ja'],
-  orange: ['hi', 'te', 'ta', 'ml', 'kn'],
-  red: ['es', 'zh'],
-  yellow: ['de'],
-};
-
-const LANGUAGE_GLOW_COLORS: Record<string, string> = {
-  blue: 'rgba(58,125,255,0.22)',
-  orange: 'rgba(228,127,46,0.22)',
-  red: 'rgba(255,61,61,0.22)',
-  yellow: 'rgba(245,196,0,0.22)',
-  purple: 'rgba(159,115,255,0.22)',
-};
-
-const getGlowColor = (code: string) => {
-  for (const group in LANGUAGE_COLOR_GROUPS) {
-    if (LANGUAGE_COLOR_GROUPS[group].includes(code)) {
-      return LANGUAGE_GLOW_COLORS[group];
-    }
-  }
-  return LANGUAGE_GLOW_COLORS.purple;
-};
-
-const GENRE_EMOJIS: { [key: string]: string } = {
-  'Action': '💥',
-  'Adventure': '🗺️',
-  'Animation': '🎨',
-  'Comedy': '😂',
-  'Crime': '🔪',
-  'Documentary': '📹',
-  'Drama': '🎭',
-  'Family': '👨‍👩‍👧‍👦',
-  'Fantasy': '🧙‍♂️',
-  'History': '📜',
-  'Horror': '👻',
-  'Music': '🎵',
-  'Mystery': '🔍',
-  'Romance': '💕',
-  'Science Fiction': '🚀',
-  'TV Movie': '📺',
-  'Thriller': '😱',
-  'War': '⚔️',
-  'Western': '🤠',
+const GENRE_NAMES: Record<number, string> = {
+  28: 'Action', 35: 'Comedy', 18: 'Drama', 53: 'Thriller',
+  80: 'Crime', 10749: 'Romance', 878: 'Sci-Fi', 27: 'Horror',
 };
 
 export const SearchScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
+  const { user } = useAuthStore();
+  const filters = useSearchFilterStore();
+  const { sortBy, setFilterSheetOpen, hasActiveFilters } = filters;
+  
+  // UI state
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  
+  // Cached movies for filtering
+  const [allCachedMovies, setAllCachedMovies] = useState<any[]>([]);
+  
+  // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('genre');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Content state
+  const [loading, setLoading] = useState(true);
+  const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
+  const [becauseYouLike, setBecauseYouLike] = useState<any[]>([]);
+  const [userGenres, setUserGenres] = useState<number[]>([]);
+  const [friendsActivity, setFriendsActivity] = useState<any[]>([]);
+  const [editorsPicks, setEditorsPicks] = useState<any[]>([]);
+  const [editorsTitle, setEditorsTitle] = useState('');
+  const [editorsSubtitle, setEditorsSubtitle] = useState('');
+  const [popularStreaming, setPopularStreaming] = useState<any[]>([]);
+  const [newlyReleased, setNewlyReleased] = useState<any[]>([]);
+  const [topRated, setTopRated] = useState<any[]>([]);
+  const [malayalamCinema, setMalayalamCinema] = useState<any[]>([]);
 
   useEffect(() => {
-    loadGenres();
-  }, []);
+    loadAllContent();
+  }, [user]);
 
-  const loadGenres = async () => {
+  // Apply filters when they change
+  useEffect(() => {
+    if (allCachedMovies.length > 0 && hasActiveFilters()) {
+      applyFiltersAndSort();
+    }
+  }, [
+    allCachedMovies.length,
+    filters.contentType,
+    filters.genres,
+    filters.yearRange,
+    filters.minRating,
+    filters.languages,
+    filters.platforms,
+    filters.platformMode,
+    sortBy,
+  ]);
+
+  const applyFiltersAndSort = async () => {
     try {
-      const movieGenres = await tmdbService.getMovieGenres();
-      setGenres(movieGenres);
+      if (allCachedMovies.length === 0) return;
+
+      const filtered = await filterEngineService.applyFilters(allCachedMovies, filters);
+      
+      setSearchResults(filtered);
+      setShowResults(true);
+      
+      console.log(`[Search] Applied filters: ${filtered.length} results from ${allCachedMovies.length} movies`);
     } catch (error) {
-      console.error('Error loading genres:', error);
+      console.error('[Search] Error applying filters:', error);
+    }
+  };
+
+  const loadAllContent = async () => {
+    try {
+      setLoading(true);
+
+      // Load ALL movies for filtering
+      console.log('[SearchScreen] Loading all cached movies...');
+      const allMovies = await cacheService.getAllMovies();
+      console.log('[SearchScreen] Loaded', allMovies.length, 'movies for filtering');
+      
+      const kannadaCount = allMovies.filter(m => m.original_language === 'kn').length;
+      console.log('[SearchScreen] Kannada movies in cache:', kannadaCount);
+      
+      setAllCachedMovies(allMovies);
+
+      const results = await Promise.all([
+        cacheService.getPopularMovies(15),
+        user ? cacheService.getUserGenres(user.id) : Promise.resolve([]),
+        user ? cacheService.getUserGenres(user.id).then(genres => 
+          genres.length > 0 ? cacheService.getMoviesByMultipleGenres(genres, 12) : []
+        ) : Promise.resolve([]),
+        user ? cacheService.getFriendsWatchlist(user.id, 10) : Promise.resolve([]),
+        cacheService.getEditorsPicks(),
+        cacheService.getPopularOnStreaming(15),
+        cacheService.getNewlyReleasedOnStreaming(20),
+        cacheService.getTopRatedMovies(15),
+        cacheService.getMoviesByLanguage('ml', 12, true),
+      ]);
+
+      const [
+        trending,
+        userGenresData,
+        becauseYouLikeData,
+        friendsData,
+        editorsData,
+        popularData,
+        newReleasesData,
+        topRatedData,
+        malayalamData,
+      ] = results;
+
+      setTrendingMovies(trending);
+      setUserGenres(userGenresData);
+      setBecauseYouLike(becauseYouLikeData);
+      setFriendsActivity(friendsData);
+      
+      if (editorsData) {
+        setEditorsPicks(editorsData.movies);
+        setEditorsTitle(editorsData.picks.title);
+        const weekOf = new Date(editorsData.picks.week_of);
+        const daysAgo = Math.floor((Date.now() - weekOf.getTime()) / (1000 * 60 * 60 * 24));
+        setEditorsSubtitle(
+          daysAgo === 0 ? 'Updated today' :
+          daysAgo === 1 ? 'Updated yesterday' :
+          `Updated ${daysAgo} days ago`
+        );
+      }
+      
+      setPopularStreaming(popularData);
+      setNewlyReleased(newReleasesData);
+      setTopRated(topRatedData);
+      setMalayalamCinema(malayalamData);
+
+    } catch (error) {
+      console.error('Error loading content:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
+    if (searchTimeout) clearTimeout(searchTimeout);
 
     if (text.length > 2) {
       const timeout = setTimeout(async () => {
         try {
-          setLoading(true);
-          const [movieResults, tvResults] = await Promise.all([
+          setSearchLoading(true);
+          const [movies, tv] = await Promise.all([
             tmdbService.searchMovies(text),
             tmdbService.searchTVShows(text),
           ]);
-          setSearchResults([...movieResults, ...tvResults]);
+          setSearchResults([...movies, ...tv]);
           setShowResults(true);
         } catch (error) {
           console.error('Error searching:', error);
         } finally {
-          setLoading(false);
+          setSearchLoading(false);
         }
-      }, 1000);
-      
+      }, 1500);
       setSearchTimeout(timeout);
     } else {
       setSearchResults([]);
@@ -191,432 +191,266 @@ export const SearchScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleItemPress = (item: any) => {
-    if ('title' in item || item.media_type === 'movie') {
-      navigation.navigate('MovieDetail', { movieId: item.tmdb_id || item.id });
+    const id = item.tmdb_id || item.id;
+    const mediaType = item.media_type || 'movie';
+    const isMovie = mediaType === 'movie';
+    
+    if (isMovie) {
+      navigation.navigate('MovieDetail', { movieId: id });
     } else {
-      navigation.navigate('ShowDetail', { showId: item.tmdb_id || item.id });
+      navigation.navigate('ShowDetail', { showId: id });
     }
   };
 
-  const clearResults = () => {
+  const clearSearch = () => {
+    setSearchQuery('');
     setSearchResults([]);
     setShowResults(false);
-    setSearchQuery('');
+    filters.resetFilters();
   };
 
-  // 🔥 NEW: Uses cache service
-  const handleGenrePress = async (genreId: number) => {
-    try {
-      setLoading(true);
-      clearResults();
-      
-      console.log(`[Search] Fetching cached movies for genre ${genreId}...`);
-      const cached = await cacheService.getMoviesByGenre(genreId, 20);
-      
-      setSearchResults(cached);
-      setShowResults(true);
-    } catch (error) {
-      console.error('Error loading genre:', error);
-    } finally {
-      setLoading(false);
-    }
+  const getGenreTitle = () => {
+    if (userGenres.length === 0) return 'Your Favorites';
+    const genreNames = userGenres
+      .slice(0, 2)
+      .map(id => GENRE_NAMES[id] || 'Movies')
+      .join(' & ');
+    return `Because You Like ${genreNames}`;
   };
 
-  // 🔥 NEW: Uses cache service
-  const handleLanguagePress = async (languageCode: string) => {
-    try {
-      setLoading(true);
-      clearResults();
-      
-      console.log(`[Search] Fetching cached movies for language ${languageCode}...`);
-      const cached = await cacheService.getMoviesByLanguage(languageCode, 20);
-      
-      setSearchResults(cached);
-      setShowResults(true);
-    } catch (error) {
-      console.error('Error loading language:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔥 NEW: Uses cache service with provider filtering
-  const handleOTTPress = async (platform: typeof INDIAN_OTT_PLATFORMS[0]) => {
-    try {
-      setLoading(true);
-      clearResults();
-      
-      console.log(`[Search] Fetching cached movies for provider ${platform.name}...`);
-      const cached = await cacheService.getMoviesByProvider(platform.id, 'IN', 20);
-      
-      // If no cached results, fallback to popular
-      if (cached.length === 0) {
-        console.log(`[Search] No cached results, using popular fallback...`);
-        const popular = await cacheService.getPopularMovies(20);
-        setSearchResults(popular);
-      } else {
-        setSearchResults(cached);
-      }
-      
-      setShowResults(true);
-    } catch (error) {
-      console.error('Error loading OTT:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderToggleButtons = () => {
-    const segments = ['Genre', 'Platform', 'Language'];
-    const modeMap: SearchMode[] = ['genre', 'ott', 'language'];
-    const currentIndex = modeMap.indexOf(searchMode);
-
+  // Search results view
+  if (showResults && searchResults.length > 0) {
     return (
-      <View style={styles.toggleWrapper}>
-        <SegmentedControl
-          segments={segments}
-          selectedIndex={currentIndex}
-          onChange={(index) => {
-            setSearchMode(modeMap[index]);
-            clearResults();
-          }}
-        />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Container style={localStyles.container}>
+          {/* Search Bar + Buttons */}
+          <View style={localStyles.header}>
+            <View style={localStyles.searchWrapper}>
+              <View style={[localStyles.searchBox, { backgroundColor: colors.card, borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Ionicons name="search" size={22} color="#8E8A9A" style={{ marginRight: 12, opacity: 0.7 }} />
+                <TextInput
+                  style={[localStyles.input, { color: colors.text }]}
+                  placeholder="Search movies & TV shows..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={searchQuery}
+                  onChangeText={handleSearch}
+                  returnKeyType="search"
+                />
+                <TouchableOpacity onPress={clearSearch} style={{ padding: 4, marginLeft: 4 }}>
+                  <Ionicons name="close-circle" size={22} color="#6E6A80" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={localStyles.buttons}>
+              <FilterButton variant="sort" onPress={() => setIsSortSheetOpen(true)} />
+              <FilterButton variant="filter" onPress={() => setFilterSheetOpen(true)} />
+            </View>
+          </View>
+
+          <TouchableOpacity style={localStyles.back} onPress={clearSearch}>
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            <Text style={[localStyles.backTxt, { color: colors.primary }]}>Back to Browse</Text>
+          </TouchableOpacity>
+
+          <PosterGrid data={searchResults} onItemPress={handleItemPress} />
+        </Container>
+
+        <SortBottomSheet visible={isSortSheetOpen} onClose={() => setIsSortSheetOpen(false)} />
+        <FilterBottomSheet />
       </View>
     );
-  };
-
-  const renderGenreCards = () => (
-    <View style={styles.gridContainer}>
-      {genres.map((genre) => {
-        const emoji = GENRE_EMOJIS[genre.name] || '🎬';
-        
-        const genreGlowColors: { [key: string]: string } = {
-          'Action': 'rgba(255, 107, 107, 0.22)',
-          'Adventure': 'rgba(92, 201, 255, 0.22)',
-          'Animation': 'rgba(255, 197, 92, 0.22)',
-          'Comedy': 'rgba(255, 184, 108, 0.22)',
-          'Crime': 'rgba(255, 92, 139, 0.22)',
-          'Documentary': 'rgba(94, 143, 255, 0.22)',
-          'Drama': 'rgba(159, 115, 255, 0.22)',
-          'Family': 'rgba(92, 255, 179, 0.22)',
-          'Fantasy': 'rgba(124, 92, 255, 0.22)',
-          'History': 'rgba(255, 184, 108, 0.22)',
-          'Horror': 'rgba(255, 92, 139, 0.22)',
-          'Music': 'rgba(159, 115, 255, 0.22)',
-          'Mystery': 'rgba(94, 143, 255, 0.22)',
-          'Romance': 'rgba(255, 92, 139, 0.22)',
-          'Science Fiction': 'rgba(92, 201, 255, 0.22)',
-          'Thriller': 'rgba(255, 92, 139, 0.22)',
-          'War': 'rgba(255, 184, 108, 0.22)',
-          'Western': 'rgba(255, 184, 108, 0.22)',
-          'TV Movie': 'rgba(94, 143, 255, 0.22)',
-        };
-
-        const glowColor = genreGlowColors[genre.name] || 'rgba(159, 115, 255, 0.22)';
-
-        return (
-          <TouchableOpacity
-            key={genre.id}
-            style={[
-              styles.genreCard,
-              { 
-                backgroundColor: colors.genreCardBg,
-                borderColor: colors.primaryBorder,
-              }
-            ]}
-            onPress={() => handleGenrePress(genre.id)}
-            activeOpacity={0.7}
-          >
-            <View style={[
-              styles.genreEmojiContainer,
-              { backgroundColor: glowColor }
-            ]}>
-              <Text style={styles.genreEmoji}>{emoji}</Text>
-            </View>
-            <Text style={[styles.genreName, { color: colors.text }]}>
-              {genre.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-
-  const renderOTTCards = () => (
-    <View style={styles.gridContainer}>
-      {INDIAN_OTT_PLATFORMS.map((platform) => (
-        <TouchableOpacity
-          key={platform.id}
-          style={[
-            styles.ottCard, 
-            { 
-              backgroundColor: colors.card,
-              borderColor: colors.cardBorder,
-            }
-          ]}
-          onPress={() => handleOTTPress(platform)}
-          activeOpacity={0.7}
-        >
-          <View style={[
-            styles.logoGlow,
-            { backgroundColor: platform.gradient[0], opacity: 0.14 }
-          ]} />
-          
-          <View style={styles.ottLogoContainer}>
-            <Image
-              source={{ uri: platform.logo }}
-              style={styles.ottLogo}
-              resizeMode="contain"
-            />
-          </View>
-          
-          <Text style={[styles.ottName, { color: colors.textSecondary }]} numberOfLines={1}>
-            {platform.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderLanguageCards = () => (
-    <View style={styles.gridContainer}>
-      {LANGUAGES.map((language) => {
-        const glow = getGlowColor(language.code);
-
-        return (
-          <TouchableOpacity
-            key={language.code}
-            style={[
-              styles.languageCard,
-              {
-                backgroundColor: '#181524',
-                borderColor: colors.cardBorder,
-              }
-            ]}
-            onPress={() => handleLanguagePress(language.code)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.languageGlow, { backgroundColor: glow }]} />
-
-            <View style={styles.languageLogoContainer}>
-              <Text style={{ fontSize: 34 }}>{language.emoji}</Text>
-            </View>
-
-            <Text style={styles.languageText}>
-              {language.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-
-  if (loading) {
-    return <LoadingSpinner />;
   }
 
+  // Main browse view
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Container style={styles.container}>
-        <View style={styles.searchSection}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={handleSearch}
-            placeholder="Search movies & TV shows..."
-          />
+    <View style={{ flex: 1, backgroundColor: '#0E0E12' }}>
+      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+        <View style={{ backgroundColor: '#0E0E12' }}>
+          
+          <View style={localStyles.header}>
+            <View style={localStyles.searchWrapper}>
+              <View style={localStyles.searchBox}>
+                <Ionicons name="search" size={22} color="#8E8A9A" style={{ marginRight: 12, opacity: 0.7 }} />
+                <TextInput
+                  style={localStyles.input}
+                  placeholder="Search movies & TV shows..."
+                  placeholderTextColor="#6E6A80"
+                  value={searchQuery}
+                  onChangeText={handleSearch}
+                  returnKeyType="search"
+                />
+                {searchLoading && <ActivityIndicator size="small" color="#8B5CFF" style={{ marginLeft: 8 }} />}
+              </View>
+            </View>
+            
+            <View style={localStyles.buttons}>
+              <FilterButton variant="sort" onPress={() => setIsSortSheetOpen(true)} />
+              <FilterButton variant="filter" onPress={() => setFilterSheetOpen(true)} />
+            </View>
+          </View>
+          
+          <View style={{ height: 24, backgroundColor: 'transparent' }} />
         </View>
 
-        {showResults && searchResults.length > 0 ? (
-          <View style={styles.resultsWrapper}>
-            <View style={styles.backButtonContainer}>
-              <TouchableOpacity 
-                style={[styles.backButton, { backgroundColor: colors.backgroundSecondary }]} 
-                onPress={clearResults}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.backButtonText, { color: colors.primary }]}>← Back to Browse</Text>
-              </TouchableOpacity>
-            </View>
-            <PosterGrid 
-              data={searchResults} 
-              onItemPress={handleItemPress}
-            />
+        {loading ? (
+          <View style={localStyles.loading}>
+            <ActivityIndicator size="large" color="#8B5CFF" />
+            <Text style={localStyles.loadingTxt}>Loading content...</Text>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {renderToggleButtons()}
-            
-            <View style={styles.contentContainer}>
-              {searchMode === 'genre' && renderGenreCards()}
-              {searchMode === 'ott' && renderOTTCards()}
-              {searchMode === 'language' && renderLanguageCards()}
-            </View>
-          </ScrollView>
+          <>
+            <ContentRow title="Trending Now in India" data={trendingMovies} onItemPress={handleItemPress} />
+            <View style={localStyles.divider} />
+
+            {becauseYouLike.length > 0 && (
+              <>
+                <ContentRow title={getGenreTitle()} subtitle="Based on your preferences" data={becauseYouLike} onItemPress={handleItemPress} />
+                <View style={localStyles.divider} />
+              </>
+            )}
+
+            {user && (
+              <>
+                <ContentRow 
+                  title="Popular in Your Network" 
+                  subtitle={friendsActivity.length > 0 ? "What your friends are watching" : undefined} 
+                  data={friendsActivity} 
+                  onItemPress={handleItemPress} 
+                  emptyMessage="Follow friends to see their watchlist activity" 
+                />
+                <View style={localStyles.divider} />
+              </>
+            )}
+
+            {editorsPicks.length > 0 && (
+              <>
+                <ContentRow 
+                  title={editorsTitle} 
+                  subtitle={`By WatchMates Team • ${editorsSubtitle}`} 
+                  data={editorsPicks} 
+                  onItemPress={handleItemPress} 
+                />
+                <View style={localStyles.divider} />
+              </>
+            )}
+
+            <ContentRow 
+              title="Popular on Streaming This Week" 
+              subtitle="Across all platforms in India" 
+              data={popularStreaming} 
+              onItemPress={handleItemPress} 
+            />
+            <View style={localStyles.divider} />
+
+            <ContentRow 
+              title="Newly Released on Streaming" 
+              subtitle="Recent additions across all platforms" 
+              data={newlyReleased} 
+              onItemPress={handleItemPress} 
+            />
+            <View style={localStyles.divider} />
+
+            <ContentRow 
+              title="Top Rated Movies You Shouldn't Miss" 
+              subtitle="IMDb 7.5+ • 300+ votes • 2015 onwards" 
+              data={topRated} 
+              onItemPress={handleItemPress} 
+            />
+            <View style={localStyles.divider} />
+
+            {malayalamCinema.length > 0 && (
+              <>
+                <ContentRow 
+                  title="Best of Malayalam Cinema" 
+                  subtitle="Hidden gems from Kerala" 
+                  data={malayalamCinema} 
+                  onItemPress={handleItemPress} 
+                />
+                <View style={localStyles.divider} />
+              </>
+            )}
+
+            <View style={{ height: 100 }} />
+          </>
         )}
-      </Container>
+      </ScrollView>
+
+      <SortBottomSheet visible={isSortSheetOpen} onClose={() => setIsSortSheetOpen(false)} />
+      <FilterBottomSheet />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 0,
+const localStyles = StyleSheet.create({
+  container: { 
+    padding: 0 
   },
-  searchSection: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-  },
-  toggleWrapper: {
-    paddingHorizontal: spacing.md,
-  },
-  contentContainer: {
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-  },
-  gridContainer: {
+  header: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  genreCard: {
-    width: '48%',
-    borderRadius: 22,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 16,
+    gap: 10,
   },
-  genreEmojiContainer: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  genreEmoji: {
-    fontSize: 34,
-  },
-  genreName: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  ottCard: {
-    width: '48%',
-    borderRadius: 22,
-    padding: spacing.xl,
-    marginBottom: spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
-    position: 'relative',
-    overflow: 'visible',
-  },
-  logoGlow: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    top: 12,
-    alignSelf: 'center',
-  },
-  ottLogoContainer: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 12,
-    shadowColor: 'rgba(255, 255, 255, 0.08)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 4,
-    marginBottom: spacing.md,
-  },
-  ottLogo: {
-    width: '100%',
-    height: '100%',
-  },
-  ottName: {
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  languageCard: {
-    width: '48%',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    overflow: 'visible',
-  },
-  languageGlow: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    top: 10,
-    alignSelf: 'center',
-    opacity: 0.22,
-  },
-  languageLogoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FFFFFF',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    marginBottom: spacing.sm,
-  },
-  languageText: {
-    color: '#B9B4C8',
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  resultsWrapper: {
+  searchWrapper: {
     flex: 1,
   },
-  backButtonContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+  searchBox: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    height: 52,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: '#1A1A20',
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
-  backButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.sm,
+  input: { 
+    flex: 1, 
+    fontSize: 17,
+    fontWeight: '500',
+    paddingVertical: 0,
+    color: '#F5F5FF',
   },
-  backButtonText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+  buttons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  back: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: spacing.md, 
+    paddingTop: 12,
+    paddingBottom: spacing.sm, 
+    gap: 8 
+  },
+  backTxt: { 
+    fontSize: 15, 
+    fontWeight: '600' 
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  loadingTxt: {
+    fontSize: 14,
+    color: '#6E6A80',
+    marginTop: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginHorizontal: spacing.md,
+    marginVertical: 10,
   },
 });
 
