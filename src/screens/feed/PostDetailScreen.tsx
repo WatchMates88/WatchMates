@@ -461,7 +461,7 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* Input Container - Fixed at bottom */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.inputContainer}>
           <Image
