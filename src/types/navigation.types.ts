@@ -1,4 +1,5 @@
-// src/types/navigation.types.ts - COMPLETE WITH IMAGE VIEWER
+// src/types/navigation.types.ts
+// Complete navigation types with TrailerPlayer
 
 import { NavigatorScreenParams } from '@react-navigation/native';
 
@@ -35,10 +36,14 @@ export type RootStackParamList = {
     existingRating?: number | null;
   };
 
-  // NEW: Image Viewer
   FullScreenImageViewer: {
     images: string[];
     index: number;
+  };
+
+  TrailerPlayer: {
+    videoKey: string;
+    title?: string;
   };
 
   Settings: undefined;

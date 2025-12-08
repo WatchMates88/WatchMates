@@ -1,11 +1,15 @@
+// src/screens/details/MovieDetailScreen.tsx
+// Updated with Apple TV-style trailer section
+
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Share, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Share, Alert, Linking } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../types';
 import { Button } from '../../components/common/Button';
 import { HorizontalScroll } from '../../components/media/HorizontalScroll';
 import { WatchProviders } from '../../components/media/WatchProviders';
+import { TrailerCard } from '../../components/media/TrailerCard';
 import { spacing } from '../../theme';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { watchlistService } from '../../services/supabase/watchlist.service';
@@ -28,18 +32,21 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [addingToWatchlist, setAddingToWatchlist] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
 
+  const [videos, setVideos] = useState<any[]>([]);
+  const [preferredIndex, setPreferredIndex] = useState<number>(0);
+
   useEffect(() => {
     loadMovieDetails();
   }, [movieId]);
 
   const loadMovieDetails = async () => {
     try {
-      // Fetch all data in parallel (no loading spinner shown)
-      const [details, credits, similarMovies, jwProviders] = await Promise.all([
+      const [details, credits, similarMovies, jwProviders, movieVideos] = await Promise.all([
         tmdbService.getMovieDetails(movieId),
         tmdbService.getMovieCredits(movieId),
         tmdbService.getSimilarMovies(movieId),
         streamingService.getProviders(movieId, 'movie', ['IN', 'US']),
+        tmdbService.getMovieVideos(movieId),
       ]);
       
       setMovie(details);
@@ -47,14 +54,22 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setSimilar(similarMovies.slice(0, 10));
       setProviders(jwProviders);
 
-      // Watchlist check (non-blocking)
+      if (movieVideos && movieVideos.list && movieVideos.list.length) {
+        // Filter to only Trailers and Teasers
+        const filtered = movieVideos.list.filter((v: any) => 
+          v.type === 'Trailer' || v.type === 'Teaser'
+        );
+        setVideos(filtered);
+      } else {
+        setVideos([]);
+      }
+
       if (user) {
         const item = await watchlistService.isInWatchlist(user.id, movieId, 'movie');
         setWatchlistItem(item);
       }
     } catch (error) {
       console.error('Error loading movie details:', error);
-      // Show error state instead of loading
       setMovie(null);
     }
   };
@@ -134,7 +149,14 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     navigation.push('MovieDetail', { movieId: item.id });
   };
 
-  // Error state (no loading spinner!)
+  // Open trailer in fullscreen modal
+  const handleOpenTrailer = (videoKey: string, videoTitle: string) => {
+    navigation.navigate('TrailerPlayer', {
+      videoKey,
+      title: videoTitle,
+    });
+  };
+
   if (movie === null && !movie) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
@@ -147,7 +169,6 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  // Show content immediately (even if some data is still loading)
   const year = movie?.release_date ? new Date(movie.release_date).getFullYear() : 'N/A';
   const runtime = movie?.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
   const isInWatchlist = !!watchlistItem;
@@ -155,7 +176,7 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      
+
       {/* Backdrop */}
       {movie?.backdrop_path && (
         <View style={styles.backdropContainer}>
@@ -222,7 +243,35 @@ export const MovieDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Streaming Providers (shows immediately if available) */}
+        {/* PREMIUM TRAILER SECTION - APPLE TV STYLE */}
+        {videos && videos.length > 0 && (
+          <View style={styles.trailerSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Trailers & Videos</Text>
+              <Text style={styles.sectionCount}>{videos.length}</Text>
+            </View>
+            
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.trailerScroll}
+              decelerationRate="fast"
+            >
+              {videos.map((video: any, index: number) => (
+                <TrailerCard
+                  key={video.key}
+                  videoKey={video.key}
+                  title={video.name}
+                  type={video.type}
+                  isOfficial={video.official}
+                  onPress={() => handleOpenTrailer(video.key, video.name)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Streaming Providers */}
         <WatchProviders providers={providers} mediaType="movie" tmdbId={movieId} />
 
         {/* Divider */}
@@ -336,7 +385,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   
-  content: { paddingBottom: spacing.xxl },
+  content: { paddingBottom: spacing.xl },
   
   title: {
     fontSize: 28,
@@ -398,6 +447,32 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: 10,
+  },
+
+  // PREMIUM TRAILER SECTION
+  trailerSection: {
+    marginTop: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#F5F5FF',
+  },
+  sectionCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  trailerScroll: {
+    paddingLeft: spacing.md,
+    paddingRight: spacing.md,
   },
 
   divider: {

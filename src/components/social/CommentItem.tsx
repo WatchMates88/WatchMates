@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, Dimensions } from 'react-native';
+import { Heart } from 'lucide-react-native';
 import { UserAvatar } from '../user/UserAvatar';
 import { Comment } from '../../types';
 import { spacing, typography } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const IMAGE_WIDTH = SCREEN_WIDTH * 0.6; // Smaller for comments (60% instead of 75%)
 
 interface CommentItemProps {
   comment: Comment;
@@ -83,13 +86,13 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
   return (
     <View style={[styles.container, isReply && styles.replyIndent]}>
-      {/* Left side - Avatar with reply line */}
+      {/* Left side - Avatar */}
       <View style={styles.leftSide}>
         <TouchableOpacity onPress={() => onUserPress(comment.user_id)} activeOpacity={0.7}>
           <UserAvatar
             avatarUrl={comment.profile?.avatar_url}
             username={comment.profile?.username || 'User'}
-            size={isReply ? 28 : 32}
+            size={isReply ? 28 : 34}
           />
         </TouchableOpacity>
       </View>
@@ -121,21 +124,31 @@ export const CommentItem: React.FC<CommentItemProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {/* Actions: Like + Reply */}
+        {/* Comment Images - THREADS ASPECT RATIO */}
+        {comment.images && comment.images.length > 0 && (
+          <Image
+            source={{ uri: comment.images[0] }}
+            style={styles.commentImage}
+            resizeMode="cover"
+          />
+        )}
+
+        {/* Actions: Like + Reply - RED LIKE BUTTON */}
         <View style={styles.actions}>
           <TouchableOpacity 
             style={styles.actionButton} 
             onPress={() => onLike(comment.id)}
             activeOpacity={0.7}
           >
-            <Ionicons
-              name={comment.is_liked ? 'heart' : 'heart-outline'}
+            <Heart
               size={16}
-              color={comment.is_liked ? '#FF6B6B' : colors.iconInactive}
+              color={comment.is_liked ? colors.likeRed : colors.iconInactive}
+              fill={comment.is_liked ? colors.likeRed : 'none'}
+              strokeWidth={1.8}
             />
             {(comment.like_count || 0) > 0 && (
               <Text style={[styles.actionCount, { 
-                color: comment.is_liked ? '#FF6B6B' : colors.textTertiary 
+                color: comment.is_liked ? colors.likeRed : colors.textTertiary 
               }]}>
                 {comment.like_count}
               </Text>
@@ -147,7 +160,6 @@ export const CommentItem: React.FC<CommentItemProps> = ({
             onPress={() => onReply(comment)}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-undo-outline" size={16} color={colors.iconInactive} />
             <Text style={[styles.actionText, { color: colors.textTertiary }]}>Reply</Text>
           </TouchableOpacity>
         </View>
@@ -163,7 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   replyIndent: {
-    paddingLeft: spacing.xxl,
+    paddingLeft: spacing.xl + spacing.md,
   },
   leftSide: {
     marginRight: spacing.md,
@@ -178,11 +190,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   username: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   time: {
     fontSize: 13,
+    fontWeight: '400',
   },
   edited: {
     fontSize: 12,
@@ -192,6 +206,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     marginBottom: spacing.sm,
+  },
+  commentImage: {
+    width: IMAGE_WIDTH,
+    aspectRatio: 4/5, // Threads-style portrait aspect ratio
+    borderRadius: 12,
+    marginBottom: spacing.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   actions: {
     flexDirection: 'row',
@@ -203,7 +225,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionCount: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
   },
   actionText: {

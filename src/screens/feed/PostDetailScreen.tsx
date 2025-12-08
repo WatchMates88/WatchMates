@@ -1,4 +1,4 @@
-// src/screens/feed/PostDetailScreen.tsx - COMPLETE WITH IMAGE UPLOAD
+// src/screens/feed/PostDetailScreen.tsx - CAREFUL UPDATES
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -15,6 +15,8 @@ import {
   Image,
   StatusBar,
   ActivityIndicator,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -25,6 +27,9 @@ import { RootStackParamList, Post, Comment } from '../../types';
 import { usePostsStore, useAuthStore, useCommentsStore } from '../../store';
 import { commentsService } from '../../services/supabase/comments.service';
 import { imageUploadService } from '../../services/supabase/ImageUpload.service';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const IMAGE_WIDTH = SCREEN_WIDTH * 0.7; // Threads-style 70%
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostDetail'>;
 
@@ -128,7 +133,6 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setPosting(true);
 
-      // Upload image if attached
       let imageUrls: string[] = [];
       if (attachedImage) {
         const url = await imageUploadService.uploadImage(attachedImage, 'comments');
@@ -213,26 +217,39 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.timestamp}>{formatTimeAgo(post.created_at)}</Text>
         </View>
 
-        <Text style={styles.postText}>{post.review_text}</Text>
-
-        {/* Display attached images */}
-        {post.images && post.images.length > 0 && (
-          <View style={styles.postImages}>
-            {post.images.map((img, idx) => (
-              <Image
-                key={idx}
-                source={{ uri: img }}
-                style={[
-                  styles.postImage,
-                  post.images!.length === 1 && styles.postImageFull,
-                ]}
-                resizeMode="cover"
-              />
-            ))}
-          </View>
+        {post.review_text && post.review_text.trim() && (
+          <Text style={styles.postText}>{post.review_text}</Text>
         )}
 
-        {post.media_poster && (
+        {/* FIXED: Threads-style horizontal scroll images */}
+        {post.images && post.images.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.postImagesScroll}
+            decelerationRate="fast"
+            snapToInterval={IMAGE_WIDTH + 8}
+          >
+            {post.images.map((img, idx) => (
+              <TouchableOpacity
+                key={idx}
+                activeOpacity={0.95}
+                onPress={() => navigation.navigate('FullScreenImageViewer', {
+                  images: post.images!,
+                  index: idx,
+                })}
+              >
+                <Image
+                  source={{ uri: img }}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {post.media_poster && post.media_id && post.media_id > 0 && (
           <View style={styles.posterContainer}>
             <Image
               source={{ uri: `https://image.tmdb.org/t/p/w500${post.media_poster}` }}
@@ -308,18 +325,27 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.commentTime}>{formatTimeAgo(item.created_at)}</Text>
           </View>
 
-          <Text style={styles.commentText}>{item.comment_text}</Text>
+          {item.comment_text && item.comment_text.trim() && (
+            <Text style={styles.commentText}>{item.comment_text}</Text>
+          )}
 
-          {/* Display comment images */}
           {item.images && item.images.length > 0 && (
             <View style={styles.commentImageContainer}>
               {item.images.map((img, idx) => (
-                <Image
+                <TouchableOpacity
                   key={idx}
-                  source={{ uri: img }}
-                  style={styles.commentImage}
-                  resizeMode="cover"
-                />
+                  activeOpacity={0.95}
+                  onPress={() => navigation.navigate('FullScreenImageViewer', {
+                    images: item.images!,
+                    index: idx,
+                  })}
+                >
+                  <Image
+                    source={{ uri: img }}
+                    style={styles.commentImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -376,7 +402,7 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (!post) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.safeContainer} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <Text style={styles.errorText}>Post not found</Text>
       </SafeAreaView>
@@ -384,55 +410,59 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }
 
   const topLevelComments = comments.filter((c) => !c.parent_comment_id);
-  const canSend = commentText.trim().length > 0;
+  const canSend = commentText.trim().length > 0 || attachedImage;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.safeContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
+      {/* Header - Fixed at top */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+          <ChevronLeft size={28} color="#FFFFFF" strokeWidth={2} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Thread</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      {/* Comments List - Separate from input */}
+      <FlatList
+        ref={flatListRef}
+        data={topLevelComments}
+        keyExtractor={(item) => item.id}
+        renderItem={renderComment}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      {/* Reply Context Banner */}
+      {replyingTo && (
+        <View style={styles.replyContext}>
+          <Text style={styles.replyText}>Replying to @{replyingTo.profile?.username}</Text>
+          <TouchableOpacity onPress={() => setReplyingTo(null)}>
+            <Text style={styles.cancelReply}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Image Preview */}
+      {attachedImage && (
+        <View style={styles.imagePreview}>
+          <Image source={{ uri: attachedImage }} style={styles.previewImage} />
+          <TouchableOpacity onPress={handleRemoveImage} style={styles.removePreviewBtn}>
+            <X size={16} color="#FFFFFF" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Input Container - Fixed at bottom */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
-            <ChevronLeft size={28} color="#FFFFFF" strokeWidth={2} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Thread</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        <FlatList
-          ref={flatListRef}
-          data={topLevelComments}
-          keyExtractor={(item) => item.id}
-          renderItem={renderComment}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-
-        {replyingTo && (
-          <View style={styles.replyContext}>
-            <Text style={styles.replyText}>Replying to @{replyingTo.profile?.username}</Text>
-            <TouchableOpacity onPress={() => setReplyingTo(null)}>
-              <Text style={styles.cancelReply}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {attachedImage && (
-          <View style={styles.imagePreview}>
-            <Image source={{ uri: attachedImage }} style={styles.previewImage} />
-            <TouchableOpacity onPress={handleRemoveImage} style={styles.removePreviewBtn}>
-              <X size={16} color="#FFFFFF" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.inputContainer}>
           <Image
             source={{
@@ -478,12 +508,16 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
+  safeContainer: { 
+    flex: 1, 
+    backgroundColor: '#000000',
+    paddingTop: Platform.OS === 'ios' ? 44 : 0,
+  },
   keyboardView: { flex: 1 },
 
   header: {
@@ -520,21 +554,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // Post Images
-  postImages: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  // FIXED: Threads-style horizontal scroll
+  postImagesScroll: {
+    paddingRight: 20,
     marginBottom: 16,
   },
   postImage: {
-    width: '48%',
-    aspectRatio: 4 / 3,
+    width: IMAGE_WIDTH,
+    height: Math.min(IMAGE_WIDTH * (5/4), 350),
     borderRadius: 12,
     backgroundColor: '#1A1A1A',
-  },
-  postImageFull: {
-    width: '100%',
+    marginRight: 8,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
 
   posterContainer: {
@@ -612,13 +644,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Comment Images
   commentImageContainer: { marginTop: 8, marginBottom: 8 },
   commentImage: {
     width: 200,
     height: 150,
     borderRadius: 10,
     backgroundColor: '#1A1A1A',
+  },
+
+  // NESTED REPLIES STYLES
+  repliesContainer: {
+    marginTop: 12,
+    marginLeft: 12,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(139, 92, 255, 0.2)',
+  },
+  replyItem: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  replyAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  replyContent: {
+    flex: 1,
   },
 
   commentActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 2 },
@@ -665,12 +718,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // FIXED: Proper bottom padding for iOS
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     backgroundColor: '#000000',
     borderTopWidth: 0.5,
     borderTopColor: 'rgba(255,255,255,0.05)',

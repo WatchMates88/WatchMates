@@ -1,4 +1,5 @@
-// src/navigation/StackNavigator.tsx - WITH FULLSCREEN IMAGE VIEWER
+// src/navigation/StackNavigator.tsx
+// Cleaned - Removed TrailerPlayer modal
 
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,6 +19,7 @@ import { SearchUsersScreen } from '../screens/friends/SearchUsersScreen';
 import { CreatePostScreen } from '../screens/feed/CreatePostScreen';
 import { PostDetailScreen } from '../screens/feed/PostDetailScreen';
 import { FullScreenImageViewer } from '../screens/feed/FullScreenImageViewer';
+import { TrailerPlayerModal } from '../screens/media/TrailerPlayerModal';
 
 import { SettingsScreen } from '../screens/profile/SettingsScreen';
 
@@ -55,6 +57,7 @@ export const StackNavigator = () => {
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} options={{ headerShown: false }} />
 
+          {/* Details Screens */}
           <Stack.Screen
             name="MovieDetail"
             component={MovieDetailScreen}
@@ -72,18 +75,26 @@ export const StackNavigator = () => {
             }}
           />
 
+          {/* Social */}
           <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ title: 'Profile' }} />
           <Stack.Screen name="SearchUsers" component={SearchUsersScreen} options={{ title: 'Find Friends' }} />
 
           <Stack.Screen
             name="CreatePost"
             component={CreatePostScreen}
-            options={{ title: 'Write Review', presentation: 'modal' }}
+            options={{
+              title: 'Write Review',
+              presentation: 'modal',
+            }}
           />
 
-          <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="PostDetail"
+            component={PostDetailScreen}
+            options={{ headerShown: false }}
+          />
 
-          {/* FullScreen Image Viewer */}
+          {/* Full-screen Image Viewer */}
           <Stack.Screen
             name="FullScreenImageViewer"
             component={FullScreenImageViewer}
@@ -95,8 +106,21 @@ export const StackNavigator = () => {
             }}
           />
 
+          {/* Trailer Player */}
+          <Stack.Screen
+            name="TrailerPlayer"
+            component={TrailerPlayerModal}
+            options={{
+              headerShown: false,
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+
+          {/* Settings */}
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
 
+          {/* Collections */}
           <Stack.Screen name="Collections" component={CollectionsScreen} options={{ title: 'Collections' }} />
           <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} options={{ title: 'Collection' }} />
         </>

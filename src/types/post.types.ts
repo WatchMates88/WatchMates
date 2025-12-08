@@ -10,13 +10,14 @@ export interface Post {
   rating: number | null;
   review_text: string;
 
-  images?: string[];   // NEW - multiple attached images
+  images?: string[];   // Multiple attached images
 
   created_at: string;
   updated_at: string;
 
-  like_count?: number; // Make optional since some queries may not return it
-  is_liked?: boolean;  // Make optional too
+  like_count?: number;    // Optional
+  is_liked?: boolean;     // Optional
+  comment_count?: number; // NEW - Comment count for this post
 
   profile?: {
     id: string;

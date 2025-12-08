@@ -1,4 +1,5 @@
-// src/screens/feed/FeedScreen.tsx - PREMIUM INTERNATIONAL STANDARD
+// src/screens/feed/FeedScreen.tsx
+// Updated with EmptyState and SkeletonLoader
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -13,17 +14,14 @@ import {
   Platform,
   StatusBar,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FeedPost } from '../../components/social/FeedPost';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { usePostsStore, useAuthStore, useCommentsStore } from '../../store';
+import { EmptyState } from '../../components/common/EmptyState';
+import { SkeletonLoader } from '../../components/common/SkeletonLoader';
+import { usePostsStore, useAuthStore } from '../../store';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
-import { postsService } from '../../services/supabase/posts.service';
 import { Post, Movie, TVShow } from '../../types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Props = {
   navigation: any;
@@ -32,7 +30,6 @@ type Props = {
 export const FeedScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuthStore();
   const { posts, isLoading, fetchFeed, toggleLike, deletePostById } = usePostsStore();
-  const { getCommentsForPost } = useCommentsStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,10 +68,12 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleMediaPress = (post: Post) => {
-    if (post.media_type === 'movie') {
-      navigation.navigate('MovieDetail', { movieId: post.media_id });
-    } else {
-      navigation.navigate('ShowDetail', { showId: post.media_id });
+    if (post.media_id && post.media_id > 0) {
+      if (post.media_type === 'movie') {
+        navigation.navigate('MovieDetail', { movieId: post.media_id });
+      } else {
+        navigation.navigate('ShowDetail', { showId: post.media_id });
+      }
     }
   };
 
@@ -163,18 +162,27 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
+  const handleFindFriends = () => {
+    navigation.navigate('SearchUsers');
+  };
+
   const renderSearchResult = ({ item }: { item: Movie | TVShow }) => {
     const title = 'title' in item ? item.title : item.name;
     return (
       <TouchableOpacity style={styles.searchCard} onPress={() => handleSelectMedia(item)}>
         {item.poster_path ? (
-          <Image source={{ uri: `https://image.tmdb.org/t/p/w92${item.poster_path}` }} style={styles.searchPoster} />
+          <Image 
+            source={{ uri: `https://image.tmdb.org/t/p/w92${item.poster_path}` }} 
+            style={styles.searchPoster} 
+          />
         ) : (
           <View style={styles.searchPosterPlaceholder} />
         )}
         <View style={styles.searchInfo}>
           <Text style={styles.searchTitle} numberOfLines={2}>{title}</Text>
-          <Text style={styles.searchType}>{'title' in item ? 'Movie' : 'TV Show'}</Text>
+          <Text style={styles.searchType}>
+            {'title' in item ? 'Movie' : 'TV Show'}
+          </Text>
         </View>
         <Ionicons name="add-circle" size={22} color="#A78BFA" />
       </TouchableOpacity>
@@ -185,7 +193,11 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
-        <Text style={styles.emptyText}>Please login to view feed</Text>
+        <EmptyState
+          type="feed"
+          title="Please login to view feed"
+          message="Sign in to see posts from movie lovers you follow"
+        />
       </View>
     );
   }
@@ -215,7 +227,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
       ) : (
         <>
           {isLoading && posts.length === 0 ? (
-            <LoadingSpinner />
+            <SkeletonLoader type="post" count={5} />
           ) : (
             <FlatList
               data={posts}
@@ -228,7 +240,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
                   onMediaPress={() => handleMediaPress(item)}
                   onImagePress={(index) => handleImagePress(item, index)}
                   onOptions={() => handlePostOptions(item)}
-                  commentCount={getCommentsForPost(item.id).length}
+                  commentCount={item.comment_count || 0}
                   isOwnPost={item.user_id === user?.id}
                 />
               )}
@@ -236,14 +248,18 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
               contentContainerStyle={styles.feedList}
               showsVerticalScrollIndicator={false}
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#A78BFA" colors={['#A78BFA']} />
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={handleRefresh} 
+                  tintColor="#A78BFA" 
+                  colors={['#A78BFA']} 
+                />
               }
               ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyEmoji}>🎬</Text>
-                  <Text style={styles.emptyTitle}>No posts yet</Text>
-                  <Text style={styles.emptySubtext}>Search for a movie above to create your first review!</Text>
-                </View>
+                <EmptyState
+                  type="feed"
+                  onAction={handleFindFriends}
+                />
               }
             />
           )}
@@ -323,34 +339,6 @@ const styles = StyleSheet.create({
   searchType: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
-  },
-
-  emptyText: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    marginTop: 100,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 20,
-  },
-  emptyEmoji: {
-    fontSize: 56,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 
   fab: {

@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types';
 import { colors, spacing, typography } from '../../theme';
-import { useAuthStore, useThemeStore } from '../../store';
+import { useAuthStore } from '../../store';
 import { authService } from '../../services/supabase/auth.service';
 import { supabase } from '../../services/supabase/supabase.client';
-import { useTheme } from '../../hooks/useTheme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout, setUser } = useAuthStore();
-  const { colors, isDark, toggleTheme } = useTheme();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const handleEditPhoto = async () => {
@@ -79,7 +77,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       setUploadingPhoto(true);
       const avatarUrl = await authService.uploadAvatar(user.id, uri);
       
-      // Update local user state
       const updatedProfile = await authService.getProfile(user.id);
       if (updatedProfile) {
         setUser(updatedProfile);
@@ -301,40 +298,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const ToggleRow = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    value, 
-    onValueChange,
-    isLast = false,
-  }: { 
-    icon: string; 
-    title: string; 
-    subtitle?: string; 
-    value: boolean; 
-    onValueChange: (value: boolean) => void;
-    isLast?: boolean;
-  }) => (
-    <View style={[styles.settingsRow, isLast && styles.settingsRowLast]}>
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon as any} size={20} color={colors.primary} />
-      </View>
-      <View style={styles.settingsRowText}>
-        <Text style={styles.settingsRowTitle}>{title}</Text>
-        {subtitle && (
-          <Text style={styles.settingsRowSubtitle}>{subtitle}</Text>
-        )}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.primary + '40' }}
-        thumbColor={value ? colors.primary : '#f4f3f4'}
-      />
-    </View>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -373,14 +336,9 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           />
         </SettingsSection>
 
+        {/* REMOVED: Dark Mode Toggle - App is Dark Only Now */}
+
         <SettingsSection title="App Preferences">
-          <ToggleRow
-            icon="moon-outline"
-            title="Dark Mode"
-            subtitle="Cinematic theme"
-            value={isDark}
-            onValueChange={toggleTheme}
-          />
           <SettingsRow
             icon="language-outline"
             title="Language"

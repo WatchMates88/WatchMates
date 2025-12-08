@@ -14,9 +14,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Heart, MessageCircle, Share2, Bookmark } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
+import { colors } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IMAGE_WIDTH = SCREEN_WIDTH * 0.75;
+
+// THREADS-EXACT SIZING
+const HORIZONTAL_PADDING = 16;
+const AVATAR_WIDTH = 38;
+const AVATAR_GAP = 12;
+const TEXT_INDENT = AVATAR_WIDTH + AVATAR_GAP; // 50px
+
+// Image sizing (Threads standard)
+const IMAGE_WIDTH = SCREEN_WIDTH * 0.70; // 70% of screen (Threads exact)
+const MAX_IMAGE_HEIGHT = 350; // Threads max height cap
+const IMAGE_BORDER_RADIUS = 12; // Threads exact (not 16px)
+const IMAGE_MARGIN = 8; // Tighter spacing
 
 interface Props {
   post: Post;
@@ -80,6 +92,9 @@ export const FeedPost: React.FC<Props> = ({
     return `${Math.floor(seconds / 604800)}w`;
   };
 
+  // Calculate image height (4:5 aspect, capped at 350px)
+  const imageHeight = Math.min(IMAGE_WIDTH * (5/4), MAX_IMAGE_HEIGHT);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -116,6 +131,7 @@ export const FeedPost: React.FC<Props> = ({
           <Text style={styles.text}>{post.review_text}</Text>
         )}
 
+        {/* THREADS-EXACT IMAGES */}
         {post.images && post.images.length > 0 && (
           <ScrollView
             horizontal
@@ -130,7 +146,11 @@ export const FeedPost: React.FC<Props> = ({
                 activeOpacity={0.95}
                 onPress={() => onImagePress(idx)}
               >
-                <Image source={{ uri }} style={styles.scrollImage} resizeMode="cover" />
+                <Image 
+                  source={{ uri }} 
+                  style={styles.scrollImage} 
+                  resizeMode="cover" 
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -159,8 +179,8 @@ export const FeedPost: React.FC<Props> = ({
             <Animated.View style={{ transform: [{ scale: likeScale }] }}>
               <Heart
                 size={20}
-                color={post.is_liked ? '#A78BFA' : 'rgba(255,255,255,0.5)'}
-                fill={post.is_liked ? '#A78BFA' : 'none'}
+                color={post.is_liked ? colors.likeRed : 'rgba(255,255,255,0.5)'}
+                fill={post.is_liked ? colors.likeRed : 'none'}
                 strokeWidth={1.8}
               />
             </Animated.View>
@@ -193,7 +213,7 @@ export const FeedPost: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingLeft: 16,
+    paddingLeft: HORIZONTAL_PADDING,
     paddingTop: 12,
   },
 
@@ -205,9 +225,9 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: AVATAR_WIDTH,
+    height: AVATAR_WIDTH,
+    borderRadius: AVATAR_WIDTH / 2,
   },
   userInfo: {
     flex: 1,
@@ -239,7 +259,7 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    marginLeft: 50,
+    marginLeft: TEXT_INDENT,
   },
 
   text: {
@@ -252,15 +272,16 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
 
+  // THREADS-EXACT IMAGE SIZING
   imagesScroll: {
     paddingRight: 66,
     gap: 8,
-    marginBottom: 12,
+    marginBottom: IMAGE_MARGIN, // Tighter spacing
   },
   scrollImage: {
-    width: IMAGE_WIDTH,
-    aspectRatio: 4 / 5,
-    borderRadius: 16,
+    width: IMAGE_WIDTH, // 70% of screen
+    height: Math.min(IMAGE_WIDTH * (5/4), MAX_IMAGE_HEIGHT), // 4:5 ratio, max 350px
+    borderRadius: IMAGE_BORDER_RADIUS, // 12px (Threads exact)
     backgroundColor: '#1A1A1A',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
@@ -317,14 +338,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
   },
   likedCount: {
-    color: '#A78BFA',
+    color: colors.likeRed,
   },
 
   divider: {
     height: 0.5,
     backgroundColor: 'rgba(255,255,255,0.08)',
     marginTop: 14,
-    marginLeft: 50,
+    marginLeft: TEXT_INDENT,
     marginRight: 16,
   },
 });

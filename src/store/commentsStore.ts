@@ -3,30 +3,46 @@ import { Comment } from '../types';
 import { commentsService } from '../services/supabase/comments.service';
 
 interface CommentsState {
-  // Comments by post ID
   commentsByPost: { [postId: string]: Comment[] };
   isLoading: boolean;
   
-  // Fetch comments for a post
   fetchComments: (postId: string, userId: string) => Promise<void>;
-  
-  // Add a new comment
   addComment: (comment: Comment) => void;
-  
-  // Update a comment
   updateComment: (commentId: string, commentText: string) => void;
-  
-  // Delete a comment
   removeComment: (postId: string, commentId: string) => void;
-  
-  // Toggle like on comment
   toggleCommentLike: (postId: string, commentId: string, userId: string) => Promise<void>;
-  
-  // Get comments for a specific post
   getCommentsForPost: (postId: string) => Comment[];
-  
-  // Clear comments (for cleanup)
   clearComments: (postId: string) => void;
+}
+
+// Helper: Build comment tree with nested replies
+function buildCommentTree(comments: Comment[]): Comment[] {
+  const commentMap = new Map<string, Comment>();
+  const rootComments: Comment[] = [];
+
+  // First pass: Create map of all comments
+  comments.forEach(comment => {
+    commentMap.set(comment.id, { ...comment, replies: [] });
+  });
+
+  // Second pass: Build tree structure
+  comments.forEach(comment => {
+    const commentWithReplies = commentMap.get(comment.id)!;
+    
+    if (comment.parent_comment_id) {
+      // This is a reply - add to parent
+      const parent = commentMap.get(comment.parent_comment_id);
+      if (parent) {
+        if (!parent.replies) parent.replies = [];
+        parent.replies.push(commentWithReplies);
+      }
+    } else {
+      // This is a root comment
+      rootComments.push(commentWithReplies);
+    }
+  });
+
+  return rootComments;
 }
 
 export const useCommentsStore = create<CommentsState>((set, get) => ({
@@ -38,10 +54,13 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
       set({ isLoading: true });
       const comments = await commentsService.getCommentsWithLikes(postId, userId);
       
+      // Build tree structure with nested replies
+      const commentTree = buildCommentTree(comments);
+      
       set((state) => ({
         commentsByPost: {
           ...state.commentsByPost,
-          [postId]: comments,
+          [postId]: commentTree, // Store tree, not flat list
         },
         isLoading: false,
       }));
@@ -54,10 +73,32 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
   addComment: (comment: Comment) => {
     set((state) => {
       const postComments = state.commentsByPost[comment.post_id] || [];
+      
+      // If it's a reply, add to parent's replies array
+      if (comment.parent_comment_id) {
+        const updatedComments = postComments.map(c => {
+          if (c.id === comment.parent_comment_id) {
+            return {
+              ...c,
+              replies: [...(c.replies || []), { ...comment, like_count: 0, is_liked: false, replies: [] }]
+            };
+          }
+          return c;
+        });
+        
+        return {
+          commentsByPost: {
+            ...state.commentsByPost,
+            [comment.post_id]: updatedComments,
+          },
+        };
+      }
+      
+      // Root comment - add to list
       return {
         commentsByPost: {
           ...state.commentsByPost,
-          [comment.post_id]: [...postComments, { ...comment, like_count: 0, is_liked: false }],
+          [comment.post_id]: [...postComments, { ...comment, like_count: 0, is_liked: false, replies: [] }],
         },
       };
     });
@@ -91,26 +132,45 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
   toggleCommentLike: async (postId: string, commentId: string, userId: string) => {
     const state = get();
     const comments = state.commentsByPost[postId] || [];
-    const comment = comments.find((c) => c.id === commentId);
     
+    // Find comment (could be nested)
+    const findComment = (comments: Comment[]): Comment | null => {
+      for (const comment of comments) {
+        if (comment.id === commentId) return comment;
+        if (comment.replies) {
+          const found = findComment(comment.replies);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const comment = findComment(comments);
     if (!comment) return;
     
-    // Optimistic update
     const isLiked = comment.is_liked;
     const newLikeCount = isLiked ? (comment.like_count || 0) - 1 : (comment.like_count || 0) + 1;
+    
+    // Optimistic update (recursive)
+    const updateCommentInTree = (comments: Comment[]): Comment[] => {
+      return comments.map((c) => {
+        if (c.id === commentId) {
+          return { ...c, is_liked: !isLiked, like_count: newLikeCount };
+        }
+        if (c.replies) {
+          return { ...c, replies: updateCommentInTree(c.replies) };
+        }
+        return c;
+      });
+    };
     
     set((state) => ({
       commentsByPost: {
         ...state.commentsByPost,
-        [postId]: comments.map((c) =>
-          c.id === commentId
-            ? { ...c, is_liked: !isLiked, like_count: newLikeCount }
-            : c
-        ),
+        [postId]: updateCommentInTree(comments),
       },
     }));
     
-    // Actual API call
     try {
       if (isLiked) {
         await commentsService.unlikeComment(userId, commentId);
@@ -122,11 +182,7 @@ export const useCommentsStore = create<CommentsState>((set, get) => ({
       set((state) => ({
         commentsByPost: {
           ...state.commentsByPost,
-          [postId]: comments.map((c) =>
-            c.id === commentId
-              ? { ...c, is_liked: isLiked, like_count: comment.like_count }
-              : c
-          ),
+          [postId]: updateCommentInTree(comments),
         },
       }));
       console.error('Error toggling comment like:', error);

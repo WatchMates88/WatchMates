@@ -1,4 +1,4 @@
-// src/theme/colors.ts - DARK MODE ONLY
+// src/theme/colors.ts - DARK MODE ONLY with RED LIKES
 
 export interface Colors {
   primary: string;
@@ -56,6 +56,9 @@ export interface Colors {
   overlayLight: string;
   fabGlow: string;
   fabHalo: string;
+  // NEW: Red accent for likes (industry standard)
+  likeRed: string;
+  likeRedActive: string;
 }
 
 // Dark Theme - Premium Apple Style (ONLY THEME)
@@ -115,6 +118,9 @@ export const darkColors: Colors = {
   overlayLight: 'rgba(13, 11, 20, 0.7)',
   fabGlow: 'rgba(159, 115, 255, 0.36)',
   fabHalo: 'rgba(139, 92, 255, 0.18)',
+  // NEW: Red accent for likes (industry standard)
+  likeRed: '#EF4444',
+  likeRedActive: '#DC2626',
 };
 
 // Export dark colors as the only theme

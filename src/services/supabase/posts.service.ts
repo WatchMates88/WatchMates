@@ -1,4 +1,4 @@
-// src/services/supabase/posts.service.ts - UPDATED WITH IMAGES
+// src/services/supabase/posts.service.ts - With Comment Counts
 
 import { supabase } from './supabase.client';
 import { Post } from '../../types';
@@ -12,7 +12,7 @@ export const postsService = {
     mediaPoster: string | null,
     rating: number | null,
     reviewText: string,
-    images: string[] = [] // NEW
+    images: string[] = []
   ): Promise<Post> => {
     const { data, error } = await supabase
       .from('posts')
@@ -24,7 +24,7 @@ export const postsService = {
         media_poster: mediaPoster,
         rating,
         review_text: reviewText,
-        images, // NEW
+        images,
       })
       .select()
       .single();
@@ -66,20 +66,24 @@ export const postsService = {
     if (error) throw error;
     
     if (data) {
-      const postsWithLikes = await Promise.all(
+      const postsWithLikesAndComments = await Promise.all(
         data.map(async (post) => {
-          const likeCount = await postsService.getLikeCount(post.id);
-          const isLiked = await postsService.isPostLiked(userId, post.id);
+          const [likeCount, isLiked, commentCount] = await Promise.all([
+            postsService.getLikeCount(post.id),
+            postsService.isPostLiked(userId, post.id),
+            postsService.getCommentCount(post.id), // NEW: Get comment count
+          ]);
           
           return {
             ...post,
             like_count: likeCount,
             is_liked: isLiked,
+            comment_count: commentCount, // NEW: Add to post object
           };
         })
       );
       
-      return postsWithLikes;
+      return postsWithLikesAndComments;
     }
     
     return [];
@@ -147,6 +151,17 @@ export const postsService = {
   getLikeCount: async (postId: string): Promise<number> => {
     const { count, error } = await supabase
       .from('post_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId);
+    
+    if (error) throw error;
+    return count || 0;
+  },
+
+  // NEW: Get comment count for a post
+  getCommentCount: async (postId: string): Promise<number> => {
+    const { count, error } = await supabase
+      .from('comments')
       .select('*', { count: 'exact', head: true })
       .eq('post_id', postId);
     
