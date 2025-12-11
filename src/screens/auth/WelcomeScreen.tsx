@@ -1,97 +1,177 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+// src/screens/auth/WelcomeScreen.tsx
+// Fixed Layout: Proper spacing, no cutoff
+
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image, Easing } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RootStackParamList } from '../../types';
-import { spacing, typography } from '../../theme';
-import { useTheme } from '../../hooks/useTheme';
+import { useAuthStore } from '../../store';
+import { tmdbService } from '../../services/tmdb/tmdb.service';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const POSTER_WIDTH = 110;
+const POSTER_HEIGHT = 165;
+const POSTER_MARGIN = 10;
 
-export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { colors, isDark } = useTheme();
+export const WelcomeScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideUpAnim = useRef(new Animated.Value(40)).current;
+  const logoScale = useRef(new Animated.Value(0.95)).current;
+  const button1Anim = useRef(new Animated.Value(0)).current;
+  const button2Anim = useRef(new Animated.Value(0)).current;
   
+  const { setUser } = useAuthStore();
+  const [posters, setPosters] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadTrendingPosters();
+    
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideUpAnim, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScale, {
+          toValue: 1,
+          tension: 35,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.stagger(100, [
+        Animated.timing(button1Anim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(button2Anim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    Animated.loop(
+      Animated.timing(scrollX, {
+        toValue: -(POSTER_WIDTH + POSTER_MARGIN) * 20,
+        duration: 50000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const loadTrendingPosters = async () => {
+    try {
+      const movies = await tmdbService.getTrendingMovies('week');
+      const posterPaths = movies
+        .filter(m => m.poster_path)
+        .slice(0, 20)
+        .map(m => `https://image.tmdb.org/t/p/w342${m.poster_path}`);
+      
+      setPosters([...posterPaths, ...posterPaths, ...posterPaths]);
+    } catch (error) {
+      console.error('Error loading posters:', error);
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Content */}
-      <View style={styles.content}>
-        {/* Icon - Premium circular design */}
-        <View style={[styles.iconContainer, {
-          backgroundColor: isDark ? colors.backgroundSecondary : '#F3F0FF',
-          shadowColor: colors.primary,
-        }]}>
-          <Text style={styles.iconEmoji}>🎬</Text>
-        </View>
+    <View style={styles.container}>
+      {/* Rolling Posters Background */}
+      <View style={styles.postersSection}>
+        <Animated.View style={[styles.posterRow, { transform: [{ translateX: scrollX }] }]}>
+          {posters.map((uri, index) => (
+            <Image key={`r1-${index}`} source={{ uri }} style={styles.poster} />
+          ))}
+        </Animated.View>
 
-        {/* App Name - Premium typography */}
-        <View style={styles.logoContainer}>
-          <Text style={[styles.logoWatch, { color: colors.text }]}>Watch</Text>
-          <Text style={[styles.logoMates, { color: colors.primary }]}>Mates</Text>
-          <View style={[styles.logoDot, { backgroundColor: colors.secondary }]} />
-        </View>
+        <Animated.View style={[styles.posterRow, { transform: [{ translateX: Animated.multiply(scrollX, 0.7) }] }]}>
+          {posters.map((uri, index) => (
+            <Image key={`r2-${index}`} source={{ uri }} style={styles.poster} />
+          ))}
+        </Animated.View>
 
-        {/* Subtitles */}
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Your personal movie tracker.
-        </Text>
-        <Text style={[styles.description, { color: colors.textTertiary }]}>
-          Simple. Social. Cinema.
-        </Text>
-
-        {/* Feature Pills - Premium cards */}
-        <View style={styles.featuresContainer}>
-          <View style={[styles.featurePill, {
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <Text style={styles.featureEmoji}>📝</Text>
-            <Text style={[styles.featureText, { color: colors.text }]}>Track Watchlist</Text>
-          </View>
-          <View style={[styles.featurePill, {
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <Text style={styles.featureEmoji}>👥</Text>
-            <Text style={[styles.featureText, { color: colors.text }]}>Connect Friends</Text>
-          </View>
-          <View style={[styles.featurePill, {
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <Text style={styles.featureEmoji}>⭐</Text>
-            <Text style={[styles.featureText, { color: colors.text }]}>Rate & Review</Text>
-          </View>
-        </View>
+        <Animated.View style={[styles.posterRow, { transform: [{ translateX: Animated.multiply(scrollX, 0.5) }] }]}>
+          {posters.map((uri, index) => (
+            <Image key={`r3-${index}`} source={{ uri }} style={styles.poster} />
+          ))}
+        </Animated.View>
+        
+        <LinearGradient
+          colors={['rgba(10, 10, 15, 0.2)', 'rgba(10, 10, 15, 0.85)', '#0A0A0F']}
+          locations={[0, 0.55, 0.92]}
+          style={styles.gradientOverlay}
+        />
       </View>
 
-      {/* Buttons - Premium style */}
-      <View style={styles.buttonsContainer}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Signup')}
-          activeOpacity={0.8}
+      {/* Content Section - Fixed Layout */}
+      <View style={styles.contentSection}>
+        <Animated.View 
+          style={[
+            styles.logoArea,
+            { 
+              opacity: fadeAnim,
+              transform: [{ translateY: slideUpAnim }, { scale: logoScale }]
+            }
+          ]}
         >
-          <LinearGradient
-            colors={[colors.primary, colors.primaryActive]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
-          >
-            <Text style={styles.primaryButtonText}>Get Started</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.secondaryButton, {
-            borderColor: colors.border,
-          }]}
-          onPress={() => navigation.navigate('Login')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-            I Already Have an Account
+          <Text style={styles.appName}>
+            Watch<Text style={styles.appNameAccent}>Mates</Text>
           </Text>
-        </TouchableOpacity>
+          <Text style={styles.tagline}>
+            Track the movies you love. Discover what to watch next.
+          </Text>
+        </Animated.View>
+
+        {/* Spacer */}
+        <View style={styles.spacer} />
+
+        {/* Buttons Area */}
+        <View style={styles.buttonsArea}>
+          <Animated.View style={{ opacity: button1Anim }}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => navigation.navigate('Signup' as never)}
+              activeOpacity={0.88}
+            >
+              <LinearGradient
+                colors={['#8B5CFF', '#A78BFA']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.primaryButtonText}>Get Started</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <Animated.View style={{ opacity: button2Anim }}>
+            <TouchableOpacity
+              style={styles.loginLink}
+              onPress={() => navigation.navigate('Login' as never)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.loginLinkText}>
+                Already have an account?{' '}
+                <Text style={styles.loginLinkAccent}>Log In</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </View>
     </View>
   );
@@ -100,124 +180,110 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
+    backgroundColor: '#0A0A0F',
   },
-  content: {
+  
+  // Posters Section
+  postersSection: {
+    height: SCREEN_HEIGHT * 0.52,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  posterRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  poster: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    borderRadius: 8,
+    marginRight: POSTER_MARGIN,
+    backgroundColor: '#1A1A20',
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  
+  // Content Section - NO space-between, manual control
+  contentSection: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
+    paddingTop: 60,
+    paddingBottom: 110, // Enough space from bottom tabs
   },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    justifyContent: 'center',
+  
+  // Logo Area
+  logoArea: {
     alignItems: 'center',
-    marginBottom: 48,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 6,
   },
-  iconEmoji: {
-    fontSize: 56,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  appName: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -1.6,
     marginBottom: 16,
-  },
-  logoWatch: {
-    fontSize: 42,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-  },
-  logoMates: {
-    fontSize: 42,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-  },
-  logoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 4,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 4,
-    letterSpacing: -0.3,
   },
-  description: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 56,
+  appNameAccent: {
+    color: '#8B5CFF',
   },
-  featuresContainer: {
-    width: '100%',
-    gap: 14,
-  },
-  featurePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  featureEmoji: {
-    fontSize: 26,
-    marginRight: 16,
-  },
-  featureText: {
+  tagline: {
     fontSize: 16,
     fontWeight: '600',
-    letterSpacing: -0.2,
+    color: 'rgba(255, 255, 255, 0.75)',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 12,
   },
-  buttonsContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: 56,
-    gap: 14,
+  
+  // Flexible spacer
+  spacer: {
+    flex: 1,
+    minHeight: 40,
+  },
+  
+  // Buttons Area
+  buttonsArea: {
+    gap: 18,
   },
   primaryButton: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#8B5CFF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 10,
   },
-  gradientButton: {
-    paddingVertical: 20,
+  buttonGradient: {
+    paddingVertical: 18,
     alignItems: 'center',
   },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 18,
-    borderRadius: 20,
+  loginLink: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    borderWidth: 1,
   },
-  secondaryButtonText: {
+  loginLinkText: {
     fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.65)',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  loginLinkAccent: {
+    color: '#A78BFA',
+    fontWeight: '700',
   },
 });

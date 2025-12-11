@@ -1,6 +1,11 @@
+// src/store/friendsStore.ts
+// Complete with Guest UUID checks
+
 import { create } from 'zustand';
 import { Profile } from '../types';
 import { friendsService } from '../services/supabase/friends.service';
+
+const GUEST_UUID = '00000000-0000-0000-0000-000000000000';
 
 interface FriendsState {
   followers: Profile[];
@@ -43,24 +48,38 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   },
   
   fetchFollowers: async (userId: string) => {
+    // Skip for guest users
+    if (userId === GUEST_UUID) {
+      set({ followers: [], isLoading: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       const followers = await friendsService.getFollowers(userId);
       get().setFollowers(followers);
     } catch (error) {
       console.error('Error fetching followers:', error);
+      set({ followers: [] });
     } finally {
       set({ isLoading: false });
     }
   },
   
   fetchFollowing: async (userId: string) => {
+    // Skip for guest users
+    if (userId === GUEST_UUID) {
+      set({ following: [], isLoading: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       const following = await friendsService.getFollowing(userId);
       get().setFollowing(following);
     } catch (error) {
       console.error('Error fetching following:', error);
+      set({ following: [] });
     } finally {
       set({ isLoading: false });
     }
@@ -77,4 +96,4 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   }),
   
   setLoading: (isLoading) => set({ isLoading }),
-  }));
+}));

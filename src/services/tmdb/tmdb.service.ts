@@ -1,3 +1,5 @@
+// src/services/tmdb/tmdb.service.ts - COMPLETE FILE
+
 import { TMDB_BASE_URL } from '../../utils/constants';
 import { TMDBResponse, TMDBMovie, TMDBTVShow } from './tmdb.types';
 
@@ -22,7 +24,7 @@ class TMDBService {
   }
 
   // -------------------------
-  // VIDEO HELPERS (NEW)
+  // VIDEO HELPERS
   // -------------------------
   private normalizeVideoItem(v: any) {
     // returns a consistent object for each TMDB video entry
@@ -121,7 +123,9 @@ class TMDBService {
     }
   }
 
-  // Movies
+  // -------------------------
+  // MOVIES
+  // -------------------------
   async getTrendingMovies(timeWindow: 'day' | 'week' = 'week'): Promise<TMDBMovie[]> {
     const data = await this.fetch<TMDBResponse<TMDBMovie>>(`/trending/movie/${timeWindow}`);
     return data.results;
@@ -156,7 +160,9 @@ class TMDBService {
     return data.results;
   }
 
-  // TV Shows
+  // -------------------------
+  // TV SHOWS
+  // -------------------------
   async getTrendingTVShows(timeWindow: 'day' | 'week' = 'week'): Promise<TMDBTVShow[]> {
     const data = await this.fetch<TMDBResponse<TMDBTVShow>>(`/trending/tv/${timeWindow}`);
     return data.results;
@@ -191,7 +197,9 @@ class TMDBService {
     return data.results;
   }
 
-  // Genres
+  // -------------------------
+  // GENRES
+  // -------------------------
   async getMovieGenres(): Promise<{ id: number; name: string }[]> {
     const data = await this.fetch<{ genres: { id: number; name: string }[] }>('/genre/movie/list');
     return data.genres;
@@ -202,7 +210,9 @@ class TMDBService {
     return data.genres;
   }
 
-  // Cast & Crew
+  // -------------------------
+  // CAST & CREW
+  // -------------------------
   async getMovieCredits(movieId: number): Promise<any> {
     return this.fetch(`/movie/${movieId}/credits`);
   }
@@ -211,7 +221,9 @@ class TMDBService {
     return this.fetch(`/tv/${showId}/credits`);
   }
 
-  // Similar & Recommendations
+  // -------------------------
+  // SIMILAR & RECOMMENDATIONS
+  // -------------------------
   async getSimilarMovies(movieId: number): Promise<TMDBMovie[]> {
     const data = await this.fetch<TMDBResponse<TMDBMovie>>(`/movie/${movieId}/similar`);
     return data.results;
@@ -232,7 +244,9 @@ class TMDBService {
     return data.results;
   }
 
-  // Watch Providers
+  // -------------------------
+  // WATCH PROVIDERS
+  // -------------------------
   async getMovieWatchProviders(movieId: number): Promise<any> {
     return this.fetch(`/movie/${movieId}/watch/providers`);
   }
@@ -241,7 +255,32 @@ class TMDBService {
     return this.fetch(`/tv/${showId}/watch/providers`);
   }
 
-  // Helper to get image URL
+  // -------------------------
+  // REVIEWS (NEW)
+  // -------------------------
+  async getMovieReviews(movieId: number): Promise<any> {
+    try {
+      const data = await this.fetch<{ results: any[] }>(`/movie/${movieId}/reviews`);
+      return data.results || [];
+    } catch (error) {
+      console.error('Error fetching movie reviews:', error);
+      return [];
+    }
+  }
+
+  async getTVReviews(showId: number): Promise<any> {
+    try {
+      const data = await this.fetch<{ results: any[] }>(`/tv/${showId}/reviews`);
+      return data.results || [];
+    } catch (error) {
+      console.error('Error fetching TV reviews:', error);
+      return [];
+    }
+  }
+
+  // -------------------------
+  // HELPERS
+  // -------------------------
   getImageUrl(path: string | null, size: string = 'w500'): string | null {
     if (!path) return null;
     return `https://image.tmdb.org/t/p/${size}${path}`;

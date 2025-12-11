@@ -1,0 +1,210 @@
+.
+├── App.tsx
+├── LICENSE
+├── README.md
+├── app.json
+├── assets
+│   ├── adaptive-icon.png
+│   ├── favicon.png
+│   ├── icon.png
+│   ├── splash-icon.png
+│   └── splash.png
+├── babel.config.js
+├── eas.json
+├── index.ts
+├── package-lock.json
+├── package.json
+├── project_structure.txt
+├── src
+│   ├── components
+│   │   ├── auth
+│   │   │   └── SignupPromptModal.tsx
+│   │   ├── common
+│   │   │   ├── Button.tsx
+│   │   │   ├── EmptyState.tsx
+│   │   │   ├── ErrorMessage.tsx
+│   │   │   ├── LoadingSpinner.tsx
+│   │   │   ├── SegmentedControl.tsx
+│   │   │   └── SkeletonLoader.tsx
+│   │   ├── layout
+│   │   │   ├── Container.tsx
+│   │   │   └── SectionHeader.tsx
+│   │   ├── media
+│   │   │   ├── AddToListModal.tsx
+│   │   │   ├── AspectRatioImage.tsx
+│   │   │   ├── ContentRow.tsx
+│   │   │   ├── FeaturedCarousel.tsx
+│   │   │   ├── HorizontalScroll.tsx
+│   │   │   ├── PostCardNew.tsx
+│   │   │   ├── PosterCard.tsx
+│   │   │   ├── PosterGrid.tsx
+│   │   │   ├── TrailerCard.tsx
+│   │   │   └── WatchProviders.tsx
+│   │   ├── reviews
+│   │   │   └── ReviewCard.tsx
+│   │   ├── search
+│   │   │   ├── FilterBottomSheet.tsx
+│   │   │   ├── FilterButton.tsx
+│   │   │   ├── GenreBlock.tsx
+│   │   │   ├── GenreSelector.tsx
+│   │   │   ├── LanguageSelector.tsx
+│   │   │   ├── PlatformSelector.tsx
+│   │   │   ├── RatingSelector.tsx
+│   │   │   ├── SearchBar.tsx
+│   │   │   ├── SortBottomSheet.tsx
+│   │   │   ├── SortSelector.tsx
+│   │   │   └── YearRangeSlider.tsx
+│   │   ├── social
+│   │   │   ├── CommentItem.tsx
+│   │   │   ├── CommentsSheet.tsx
+│   │   │   └── FeedPost.tsx
+│   │   └── user
+│   │       ├── FollowButton.tsx
+│   │       └── UserAvatar.tsx
+│   ├── hooks
+│   │   ├── useAutoRefresh.ts
+│   │   ├── useGuestCheck.ts
+│   │   ├── useSmartRefresh.ts
+│   │   └── useTheme.ts
+│   ├── navigation
+│   │   ├── StackNavigator.tsx
+│   │   ├── TabNavigator.tsx
+│   │   └── index.tsx
+│   ├── screens
+│   │   ├── auth
+│   │   │   ├── LoginScreen.tsx
+│   │   │   ├── SignupScreen.tsx
+│   │   │   ├── SplashScreen.tsx
+│   │   │   └── WelcomeScreen.tsx
+│   │   ├── details
+│   │   │   ├── MovieDetailScreen.tsx
+│   │   │   └── ShowDetailScreen.tsx
+│   │   ├── feed
+│   │   │   ├── CreatePostScreen.tsx
+│   │   │   ├── FeedScreen.OLD.tsx
+│   │   │   ├── FeedScreen.tsx
+│   │   │   ├── FullScreenImageViewer.tsx
+│   │   │   └── PostDetailScreen.tsx
+│   │   ├── friends
+│   │   │   ├── FriendProfileScreen.tsx
+│   │   │   ├── FriendsScreen.tsx
+│   │   │   └── SearchUsersScreen.tsx
+│   │   ├── home
+│   │   │   └── HomeScreen.tsx
+│   │   ├── media
+│   │   │   └── TrailerPlayerModal.tsx
+│   │   ├── profile
+│   │   │   ├── ProfileScreen.tsx
+│   │   │   └── SettingsScreen.tsx
+│   │   ├── reviews
+│   │   │   └── ReviewsScreen.tsx
+│   │   ├── search
+│   │   │   └── SearchScreen.tsx
+│   │   └── watchlist
+│   │       ├── CollectionDetailScreen.tsx
+│   │       ├── CollectionsScreen.tsx
+│   │       └── WatchlistScreen.tsx
+│   ├── services
+│   │   ├── filter
+│   │   │   └── filterEngine.service.ts
+│   │   ├── imageCompression.service.ts
+│   │   ├── justwatch
+│   │   │   └── justwatch.service.ts
+│   │   ├── refreshEvent.service.ts
+│   │   ├── review.service.ts
+│   │   ├── supabase
+│   │   │   ├── ImageUpload.service.ts
+│   │   │   ├── auth.service.ts
+│   │   │   ├── cache.service.ts
+│   │   │   ├── collections.service.ts
+│   │   │   ├── comments.service.ts
+│   │   │   ├── friends.service.ts
+│   │   │   ├── posts.service.ts
+│   │   │   ├── ratings.service.ts
+│   │   │   ├── supabase.client.ts
+│   │   │   └── watchlist.service.ts
+│   │   └── tmdb
+│   │       ├── tmdb.service.ts
+│   │       └── tmdb.types.ts
+│   ├── store
+│   │   ├── authStore.ts
+│   │   ├── collectionsStore.ts
+│   │   ├── commentsStore.ts
+│   │   ├── friendsStore.ts
+│   │   ├── index.ts
+│   │   ├── mediaStore.ts
+│   │   ├── postsStore.ts
+│   │   ├── searchFilterStore.ts
+│   │   ├── themeStore.ts
+│   │   └── watchlistStore.ts
+│   ├── theme
+│   │   ├── colors.ts
+│   │   ├── index.ts
+│   │   ├── spacing.ts
+│   │   ├── tokens.ts
+│   │   └── typography.ts
+│   ├── types
+│   │   ├── collection.types.ts
+│   │   ├── comment.types.ts
+│   │   ├── index.ts
+│   │   ├── media.types.ts
+│   │   ├── navigation.types.ts
+│   │   ├── post.types.ts
+│   │   ├── review.types.ts
+│   │   └── user.types.ts
+│   └── utils
+│       ├── constants.ts
+│       ├── formatters.ts
+│       ├── providerUrls.ts
+│       └── validators.ts
+├── structure.txt
+├── supabase
+│   └── functions
+│       ├── update-movie-cache
+│       │   └── index.ts
+│       ├── update-providers-batch-1
+│       │   └── index.ts
+│       ├── update-providers-batch-10
+│       │   └── index.ts
+│       ├── update-providers-batch-11
+│       │   └── index.ts
+│       ├── update-providers-batch-12
+│       │   └── index.ts
+│       ├── update-providers-batch-13
+│       │   └── index.ts
+│       ├── update-providers-batch-14
+│       │   └── index.ts
+│       ├── update-providers-batch-15
+│       │   └── index.ts
+│       ├── update-providers-batch-16
+│       │   └── index.ts
+│       ├── update-providers-batch-17
+│       │   └── index.ts
+│       ├── update-providers-batch-18
+│       │   └── index.ts
+│       ├── update-providers-batch-19
+│       │   └── index.ts
+│       ├── update-providers-batch-2
+│       │   └── index.ts
+│       ├── update-providers-batch-20
+│       │   └── index.ts
+│       ├── update-providers-batch-3
+│       │   └── index.ts
+│       ├── update-providers-batch-4
+│       │   └── index.ts
+│       ├── update-providers-batch-5
+│       │   └── index.ts
+│       ├── update-providers-batch-6
+│       │   └── index.ts
+│       ├── update-providers-batch-7
+│       │   └── index.ts
+│       ├── update-providers-batch-8
+│       │   └── index.ts
+│       ├── update-providers-batch-9
+│       │   └── index.ts
+│       └── update-providers-cache
+│           └── index.ts
+├── supabase.tar.gz
+└── tsconfig.json
+
+58 directories, 150 files

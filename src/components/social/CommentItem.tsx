@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, Dimensions } from 'react-native';
 import { Heart } from 'lucide-react-native';
 import { UserAvatar } from '../user/UserAvatar';
@@ -20,7 +20,7 @@ interface CommentItemProps {
   isReply?: boolean;
 }
 
-export const CommentItem: React.FC<CommentItemProps> = ({
+const CommentItemComponent: React.FC<CommentItemProps> = ({
   comment,
   currentUserId,
   onLike,
@@ -33,7 +33,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   const { colors } = useTheme();
   const [showActions, setShowActions] = useState(false);
 
-  const formatTimeAgo = (dateString: string): string => {
+  const formatTimeAgo = useCallback((dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -43,9 +43,9 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
     return `${Math.floor(seconds / 604800)}w`;
-  };
+  }, []);
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (comment.user_id === currentUserId) {
       Alert.alert(
         'Comment Options',
@@ -80,15 +80,28 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         ]
       );
     }
-  };
+  }, [comment, currentUserId, onEdit, onDelete]);
+
+  const handleLike = useCallback(() => {
+    onLike(comment.id);
+  }, [comment.id, onLike]);
+
+  const handleReply = useCallback(() => {
+    onReply(comment);
+  }, [comment, onReply]);
+
+  const handleUserPress = useCallback(() => {
+    onUserPress(comment.user_id);
+  }, [comment.user_id, onUserPress]);
 
   const isOwner = comment.user_id === currentUserId;
+  const isEdited = comment.updated_at !== comment.created_at;
 
   return (
     <View style={[styles.container, isReply && styles.replyIndent]}>
       {/* Left side - Avatar */}
       <View style={styles.leftSide}>
-        <TouchableOpacity onPress={() => onUserPress(comment.user_id)} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
           <UserAvatar
             avatarUrl={comment.profile?.avatar_url}
             username={comment.profile?.username || 'User'}
@@ -101,7 +114,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
       <View style={styles.rightSide}>
         {/* Header: Username + Time */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => onUserPress(comment.user_id)} activeOpacity={0.7}>
+          <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
             <Text style={[styles.username, { color: colors.text }]}>
               {comment.profile?.username || 'User'}
             </Text>
@@ -109,7 +122,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
           <Text style={[styles.time, { color: colors.textTertiary }]}>
             {formatTimeAgo(comment.created_at)}
           </Text>
-          {comment.updated_at !== comment.created_at && (
+          {isEdited && (
             <Text style={[styles.edited, { color: colors.textTertiary }]}>• edited</Text>
           )}
         </View>
@@ -137,7 +150,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         <View style={styles.actions}>
           <TouchableOpacity 
             style={styles.actionButton} 
-            onPress={() => onLike(comment.id)}
+            onPress={handleLike}
             activeOpacity={0.7}
           >
             <Heart
@@ -157,7 +170,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
           <TouchableOpacity 
             style={styles.actionButton} 
-            onPress={() => onReply(comment)}
+            onPress={handleReply}
             activeOpacity={0.7}
           >
             <Text style={[styles.actionText, { color: colors.textTertiary }]}>Reply</Text>
@@ -167,6 +180,20 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     </View>
   );
 };
+
+// ✅ MEMOIZE with custom comparison
+export const CommentItem = memo(CommentItemComponent, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.comment.id === nextProps.comment.id &&
+    prevProps.comment.is_liked === nextProps.comment.is_liked &&
+    prevProps.comment.like_count === nextProps.comment.like_count &&
+    prevProps.comment.comment_text === nextProps.comment.comment_text &&
+    prevProps.comment.updated_at === nextProps.comment.updated_at &&
+    prevProps.currentUserId === nextProps.currentUserId &&
+    prevProps.isReply === nextProps.isReply
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

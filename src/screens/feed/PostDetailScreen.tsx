@@ -1,6 +1,7 @@
-// src/screens/feed/PostDetailScreen.tsx - CAREFUL UPDATES
+// src/screens/feed/PostDetailScreen.tsx
+// Fully optimized with memoized callbacks and FlatList optimizations
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -62,7 +63,8 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [postId, user]);
 
-  const formatTimeAgo = (dateString: string): string => {
+  // ✅ MEMOIZED: Format time utility
+  const formatTimeAgo = useCallback((dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -71,17 +73,18 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
     return `${Math.floor(seconds / 604800)}w`;
-  };
+  }, []);
 
-  const handleUserPress = (userId: string) => {
+  // ✅ MEMOIZED: Navigation callbacks
+  const handleUserPress = useCallback((userId: string) => {
     if (userId === user?.id) {
       navigation.navigate('MainTabs', { screen: 'Profile' } as any);
     } else {
       navigation.navigate('FriendProfile', { userId });
     }
-  };
+  }, [navigation, user?.id]);
 
-  const handleLikePost = async () => {
+  const handleLikePost = useCallback(async () => {
     if (!user || !post) return;
 
     if (Platform.OS === 'ios') {
@@ -102,9 +105,9 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     ]).start();
 
     await toggleLike(postId, user.id);
-  };
+  }, [user, post, postId, toggleLike, heartScale]);
 
-  const handleAddPhoto = async () => {
+  const handleAddPhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
@@ -121,13 +124,13 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!result.canceled && result.assets[0]) {
       setAttachedImage(result.assets[0].uri);
     }
-  };
+  }, []);
 
-  const handleRemoveImage = () => {
+  const handleRemoveImage = useCallback(() => {
     setAttachedImage(null);
-  };
+  }, []);
 
-  const handleSubmitComment = async () => {
+  const handleSubmitComment = useCallback(async () => {
     if (!user || !commentText.trim()) return;
 
     try {
@@ -161,18 +164,18 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } finally {
       setPosting(false);
     }
-  };
+  }, [user, commentText, attachedImage, postId, replyingTo, addComment]);
 
-  const handleReply = (comment: Comment) => {
+  const handleReply = useCallback((comment: Comment) => {
     setReplyingTo(comment);
-  };
+  }, []);
 
-  const handleLikeComment = async (commentId: string) => {
+  const handleLikeComment = useCallback(async (commentId: string) => {
     if (!user) return;
     await toggleCommentLike(postId, commentId, user.id);
-  };
+  }, [user, postId, toggleCommentLike]);
 
-  const handleDeleteComment = (comment: Comment) => {
+  const handleDeleteComment = useCallback((comment: Comment) => {
     Alert.alert('Delete Comment', 'This comment will be permanently deleted.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -188,9 +191,10 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         },
       },
     ]);
-  };
+  }, [postId, removeComment]);
 
-  const renderHeader = () => {
+  // ✅ MEMOIZED: Header component
+  const renderHeader = useCallback(() => {
     if (!post) return null;
 
     return (
@@ -221,7 +225,6 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.postText}>{post.review_text}</Text>
         )}
 
-        {/* FIXED: Threads-style horizontal scroll images */}
         {post.images && post.images.length > 0 && (
           <ScrollView
             horizontal
@@ -229,10 +232,11 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             contentContainerStyle={styles.postImagesScroll}
             decelerationRate="fast"
             snapToInterval={IMAGE_WIDTH + 8}
+            removeClippedSubviews={true}
           >
             {post.images.map((img, idx) => (
               <TouchableOpacity
-                key={idx}
+                key={`post-img-${idx}`}
                 activeOpacity={0.95}
                 onPress={() => navigation.navigate('FullScreenImageViewer', {
                   images: post.images!,
@@ -301,9 +305,10 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.sectionDivider} />
       </View>
     );
-  };
+  }, [post, comments.length, handleUserPress, handleLikePost, formatTimeAgo, heartScale, navigation]);
 
-  const renderComment = ({ item }: { item: Comment }) => {
+  // ✅ MEMOIZED: Comment renderer
+  const renderComment = useCallback(({ item }: { item: Comment }) => {
     const isOwner = item.user_id === user?.id;
 
     return (
@@ -333,7 +338,7 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.commentImageContainer}>
               {item.images.map((img, idx) => (
                 <TouchableOpacity
-                  key={idx}
+                  key={`comment-img-${idx}`}
                   activeOpacity={0.95}
                   onPress={() => navigation.navigate('FullScreenImageViewer', {
                     images: item.images!,
@@ -390,15 +395,26 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </View>
     );
-  };
+  }, [user?.id, handleUserPress, formatTimeAgo, handleLikeComment, handleReply, handleDeleteComment, navigation]);
 
-  const renderEmpty = () => (
+  const renderEmpty = useCallback(() => (
     <View style={styles.emptyComments}>
       <MessageCircle size={48} color="rgba(255,255,255,0.12)" strokeWidth={1.5} />
       <Text style={styles.emptyTitle}>No comments yet</Text>
       <Text style={styles.emptySubtext}>Be the first to share your thoughts</Text>
     </View>
+  ), []);
+
+  // ✅ KEY EXTRACTOR
+  const keyExtractor = useCallback((item: Comment) => item.id, []);
+
+  // ✅ MEMOIZED: Top-level comments
+  const topLevelComments = useMemo(
+    () => comments.filter((c) => !c.parent_comment_id),
+    [comments]
   );
+
+  const canSend = commentText.trim().length > 0 || attachedImage;
 
   if (!post) {
     return (
@@ -408,9 +424,6 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </SafeAreaView>
     );
   }
-
-  const topLevelComments = comments.filter((c) => !c.parent_comment_id);
-  const canSend = commentText.trim().length > 0 || attachedImage;
 
   return (
     <View style={styles.safeContainer}>
@@ -429,13 +442,20 @@ export const PostDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <FlatList
         ref={flatListRef}
         data={topLevelComments}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderComment}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        
+        // ✅ CRITICAL PERFORMANCE OPTIMIZATIONS
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={15}
+        updateCellsBatchingPeriod={50}
+        windowSize={21}
+        initialNumToRender={10}
       />
 
       {/* Reply Context Banner */}
@@ -518,7 +538,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     paddingTop: Platform.OS === 'ios' ? 44 : 0,
   },
-  keyboardView: { flex: 1 },
 
   header: {
     flexDirection: 'row',
@@ -554,7 +573,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // FIXED: Threads-style horizontal scroll
   postImagesScroll: {
     paddingRight: 20,
     marginBottom: 16,
@@ -652,28 +670,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
   },
 
-  // NESTED REPLIES STYLES
-  repliesContainer: {
-    marginTop: 12,
-    marginLeft: 12,
-    paddingLeft: 12,
-    borderLeftWidth: 2,
-    borderLeftColor: 'rgba(139, 92, 255, 0.2)',
-  },
-  replyItem: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  replyAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-  },
-  replyContent: {
-    flex: 1,
-  },
-
   commentActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 2 },
   commentAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionText: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.5)' },
@@ -718,7 +714,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // FIXED: Proper bottom padding for iOS
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

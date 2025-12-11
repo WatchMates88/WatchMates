@@ -1,3 +1,6 @@
+// src/components/media/WatchProviders.tsx
+// Smart Provider Opening with Expo Go detection
+
 import React, { useRef } from 'react';
 import {
   View,
@@ -8,12 +11,12 @@ import {
   TouchableOpacity,
   Animated,
   Linking,
+  Platform,
+  Alert,
 } from 'react-native';
+import Constants from 'expo-constants';
 import type { ProviderAvailability } from '../../services/justwatch/justwatch.service';
-
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
+import { getProviderScheme, getProviderWebUrl } from '../../utils/providerUrls';
 
 interface WatchProvidersProps {
   providers: ProviderAvailability[];
@@ -21,16 +24,19 @@ interface WatchProvidersProps {
   tmdbId?: number;
 }
 
+interface GroupedProvider {
+  provider: string;
+  logo: string;
+  regions: string[];
+  link?: string;
+}
+
 interface ProviderItemProps {
-  provider: ProviderAvailability;
+  groupedProvider: GroupedProvider;
   onPress: () => void;
 }
 
-// ============================================
-// PROVIDER ITEM COMPONENT
-// ============================================
-
-const ProviderItem: React.FC<ProviderItemProps> = ({ provider, onPress }) => {
+const ProviderItem: React.FC<ProviderItemProps> = ({ groupedProvider, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -60,48 +66,149 @@ const ProviderItem: React.FC<ProviderItemProps> = ({ provider, onPress }) => {
       style={styles.providerItem}
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        {/* Icon Container with Glow */}
         <View style={styles.iconWrapper}>
           <View style={styles.glowEffect} />
           <View style={styles.iconContainer}>
             <Image
-              source={{ uri: provider.logo }}
+              source={{ uri: groupedProvider.logo }}
               style={styles.providerIcon}
               resizeMode="cover"
             />
           </View>
         </View>
 
-        {/* Region Badge */}
-        <View style={styles.regionBadge}>
-          <Text style={styles.regionText}>{provider.region}</Text>
-        </View>
+        <Text style={styles.regionsText}>
+          {groupedProvider.regions.join(', ')}
+        </Text>
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
-// ============================================
-// MAIN WATCH PROVIDERS COMPONENT
-// ============================================
+export const WatchProviders: React.FC<WatchProvidersProps> = ({ 
+  providers, 
+  mediaType = 'movie',
+  tmdbId 
+}) => {
+  // Check if running in Expo Go
+  const isExpoGo = Constants.appOwnership === 'expo';
 
-export const WatchProviders: React.FC<WatchProvidersProps> = ({ providers }) => {
-  const handlePress = (provider: ProviderAvailability) => {
-    if (provider.link) {
-      Linking.openURL(provider.link).catch(() => {
-        fallbackSearch(provider);
-      });
+  const groupedProviders = React.useMemo(() => {
+    const groups = new Map<string, GroupedProvider>();
+
+    providers.forEach((provider) => {
+      if (groups.has(provider.provider)) {
+        const existing = groups.get(provider.provider)!;
+        if (!existing.regions.includes(provider.region)) {
+          existing.regions.push(provider.region);
+        }
+      } else {
+        groups.set(provider.provider, {
+          provider: provider.provider,
+          logo: provider.logo,
+          regions: [provider.region],
+          link: provider.link,
+        });
+      }
+    });
+
+    return Array.from(groups.values());
+  }, [providers]);
+
+  const handlePress = async (groupedProvider: GroupedProvider) => {
+    console.log(`[Provider] Opening ${groupedProvider.provider}...`);
+    console.log(`[Provider] Expo Go mode: ${isExpoGo}`);
+
+    // If in Expo Go, always use web URLs (deep links don't work)
+    if (isExpoGo) {
+      console.log(`[Provider] Using web fallback (Expo Go limitation)`);
+      const webUrl = getProviderWebUrl(groupedProvider.provider);
+      
+      if (webUrl) {
+        try {
+          await Linking.openURL(webUrl);
+          console.log(`[Provider] ✅ Opened ${groupedProvider.provider} website`);
+        } catch (error) {
+          console.error('[Provider] Failed to open web URL:', error);
+          Alert.alert('Error', 'Could not open provider website');
+        }
+      } else {
+        fallbackSearch(groupedProvider);
+      }
+      return;
+    }
+
+    // For standalone builds, try deep links
+    const scheme = getProviderScheme(groupedProvider.provider, tmdbId, mediaType);
+
+    if (scheme) {
+      try {
+        const appUrl = scheme.app;
+        
+        console.log(`[Provider] Trying app deep link: ${appUrl}`);
+        
+        // Check if the URL can be opened (app is installed)
+        const canOpen = await Linking.canOpenURL(appUrl);
+        
+        if (canOpen) {
+          await Linking.openURL(appUrl);
+          console.log(`[Provider] ✅ Opened ${groupedProvider.provider} app`);
+        } else {
+          throw new Error('App not installed');
+        }
+      } catch (error) {
+        // App not installed - show install prompt
+        console.log(`[Provider] ${groupedProvider.provider} not installed`);
+        
+        Alert.alert(
+          `Get ${groupedProvider.provider}`,
+          `Install ${groupedProvider.provider} to watch this content`,
+          [
+            { 
+              text: 'Open Website', 
+              onPress: async () => {
+                const webUrl = getProviderWebUrl(groupedProvider.provider);
+                if (webUrl) {
+                  await Linking.openURL(webUrl);
+                }
+              }
+            },
+            {
+              text: 'Install App',
+              onPress: async () => {
+                const storeUrl = Platform.OS === 'ios' ? scheme.ios : scheme.android;
+                if (storeUrl) {
+                  try {
+                    await Linking.openURL(storeUrl);
+                  } catch (err) {
+                    console.error('Failed to open store:', err);
+                    Alert.alert('Error', 'Could not open app store');
+                  }
+                }
+              },
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
     } else {
-      fallbackSearch(provider);
+      // No scheme available - fallback to web
+      console.warn(`[Provider] No scheme for ${groupedProvider.provider}, using web fallback`);
+      const webUrl = getProviderWebUrl(groupedProvider.provider);
+      
+      if (webUrl) {
+        await Linking.openURL(webUrl);
+      } else {
+        fallbackSearch(groupedProvider);
+      }
     }
   };
 
-  const fallbackSearch = (provider: ProviderAvailability) => {
-    const query = `Watch ${provider.provider} ${provider.region}`;
+  const fallbackSearch = (groupedProvider: GroupedProvider) => {
+    const query = `Watch on ${groupedProvider.provider}`;
     Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
   };
 
-  // Empty state
   if (!providers || providers.length === 0) {
     return (
       <View style={styles.container}>
@@ -122,25 +229,28 @@ export const WatchProviders: React.FC<WatchProvidersProps> = ({ providers }) => 
 
   return (
     <View style={styles.container}>
-      {/* Section Title */}
-      <Text style={styles.sectionTitle}>Where to Watch</Text>
+      <View style={styles.header}>
+        <Text style={styles.sectionTitle}>Where to Watch</Text>
+        {isExpoGo && (
+          <Text style={styles.expoGoNotice}>Opens in browser (Expo Go)</Text>
+        )}
+      </View>
 
-      {/* Horizontal Scroll */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         decelerationRate="fast"
-        snapToInterval={72}
+        snapToInterval={80}
         snapToAlignment="start"
         bounces={true}
         style={styles.scrollView}
       >
-        {providers.map((provider, index) => (
+        {groupedProviders.map((groupedProvider, index) => (
           <ProviderItem
-            key={`${provider.provider}-${provider.region}-${index}`}
-            provider={provider}
-            onPress={() => handlePress(provider)}
+            key={`${groupedProvider.provider}-${index}`}
+            groupedProvider={groupedProvider}
+            onPress={() => handlePress(groupedProvider)}
           />
         ))}
       </ScrollView>
@@ -148,49 +258,48 @@ export const WatchProviders: React.FC<WatchProvidersProps> = ({ providers }) => 
   );
 };
 
-// ============================================
-// PREMIUM STYLES - HORIZONTAL LAYOUT
-// ============================================
-
 const styles = StyleSheet.create({
-  // Container
   container: {
     marginVertical: 20,
   },
-
-  // Section Title
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 14,
+  },
   sectionTitle: {
     fontSize: 19,
     fontWeight: '700',
     color: '#F5F5F7',
     letterSpacing: -0.4,
-    paddingHorizontal: 16,
-    marginBottom: 14,
   },
-
-  // ScrollView
+  expoGoNotice: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8B5CFF',
+    backgroundColor: 'rgba(139, 92, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
   scrollView: {
     flexGrow: 0,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingVertical: 4,
-    gap: 16,
+    gap: 20,
   },
-
-  // Provider Item
   providerItem: {
     alignItems: 'center',
-    marginRight: 16,
+    width: 70,
   },
-
-  // Icon Wrapper (for glow)
   iconWrapper: {
     position: 'relative',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-
-  // Subtle Glow Effect
   glowEffect: {
     position: 'absolute',
     top: -2,
@@ -206,8 +315,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-
-  // Icon Container (56×56)
   iconContainer: {
     width: 56,
     height: 56,
@@ -228,34 +335,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-
-  // Region Badge
-  regionBadge: {
-    alignSelf: 'center',
-    height: 20,
-    backgroundColor: 'rgba(11, 10, 15, 0.85)',
-    borderWidth: 1,
-    borderColor: '#7B61FF',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#7B61FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  regionText: {
+  regionsText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    color: '#9E9BA8',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    lineHeight: 14,
   },
-
-  // Empty State
   emptyState: {
     alignItems: 'center',
     paddingVertical: 32,

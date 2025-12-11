@@ -1,5 +1,8 @@
+// src/screens/watchlist/CollectionDetailScreen.tsx
+// Updated: Hybrid refresh system
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, Collection, CollectionItem, Movie, TVShow } from '../../types';
@@ -11,6 +14,8 @@ import { collectionsService } from '../../services/supabase/collections.service'
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { useAuthStore } from '../../store';
 import { useTheme } from '../../hooks/useTheme';
+import { useSmartRefresh } from '../../hooks/useSmartRefresh';
+import { RefreshEvents } from '../../services/refreshEvent.service';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollectionDetail'>;
 
@@ -24,13 +29,9 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
   const [collaborators, setCollaborators] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadCollectionDetails();
-  }, [collectionId]);
-
   const loadCollectionDetails = async () => {
     try {
-      setLoading(true);
+      if (loading) setLoading(true); // Only show spinner on initial load
       
       const collectionItems = await collectionsService.getCollectionItems(collectionId);
       
@@ -58,6 +59,13 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
       setLoading(false);
     }
   };
+
+  // Hybrid refresh system
+  const { refreshing, onRefresh } = useSmartRefresh({
+    onRefresh: loadCollectionDetails,
+    refreshOnEvents: [RefreshEvents.COLLECTION_UPDATED],
+    deps: [collectionId],
+  });
 
   const handleItemPress = (item: Movie | TVShow) => {
     if ('title' in item) {
@@ -177,20 +185,44 @@ export const CollectionDetailScreen: React.FC<Props> = ({ route, navigation }) =
         </View>
       )}
 
-      {/* Items Grid */}
+      {/* Items Grid with Pull-to-Refresh */}
       {items.length > 0 ? (
-        <PosterGrid 
-          data={items} 
-          onItemPress={handleItemPress}
-        />
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <PosterGrid 
+            data={items} 
+            onItemPress={handleItemPress}
+          />
+        </ScrollView>
       ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={[styles.emptyText, { color: colors.text }]}>No items yet</Text>
-          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-            Add movies and shows from their detail pages!
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>📭</Text>
+            <Text style={[styles.emptyText, { color: colors.text }]}>No items yet</Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              Add movies and shows from their detail pages!
+            </Text>
+          </View>
+        </ScrollView>
       )}
     </View>
   );

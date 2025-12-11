@@ -1,7 +1,9 @@
-// src/services/supabase/posts.service.ts - With Comment Counts
+// src/services/supabase/posts.service.ts
+// Complete file with event emissions
 
 import { supabase } from './supabase.client';
 import { Post } from '../../types';
+import { refreshEventService, RefreshEvents } from '../refreshEvent.service';
 
 export const postsService = {
   createPost: async (
@@ -30,6 +32,10 @@ export const postsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event - Feed will refresh
+    refreshEventService.emit(RefreshEvents.POST_CREATED);
+    
     return data;
   },
 
@@ -50,10 +56,19 @@ export const postsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.POST_CREATED);
+    
     return data;
   },
 
   getFeed: async (userId: string, limit: number = 20, offset: number = 0): Promise<Post[]> => {
+    // Skip query for guest users
+    if (userId === '00000000-0000-0000-0000-000000000000') {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -71,14 +86,14 @@ export const postsService = {
           const [likeCount, isLiked, commentCount] = await Promise.all([
             postsService.getLikeCount(post.id),
             postsService.isPostLiked(userId, post.id),
-            postsService.getCommentCount(post.id), // NEW: Get comment count
+            postsService.getCommentCount(post.id),
           ]);
           
           return {
             ...post,
             like_count: likeCount,
             is_liked: isLiked,
-            comment_count: commentCount, // NEW: Add to post object
+            comment_count: commentCount,
           };
         })
       );
@@ -90,6 +105,11 @@ export const postsService = {
   },
 
   getUserPosts: async (userId: string): Promise<Post[]> => {
+    // Skip query for guest users
+    if (userId === '00000000-0000-0000-0000-000000000000') {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -103,6 +123,47 @@ export const postsService = {
     return data || [];
   },
 
+  getPostsByMedia: async (
+    mediaType: 'movie' | 'tv',
+    mediaId: number,
+    userId?: string
+  ): Promise<Post[]> => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profile:profiles!posts_user_id_fkey(username, full_name, avatar_url)
+      `)
+      .eq('media_type', mediaType)
+      .eq('media_id', mediaId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    if (data && userId) {
+      const postsWithLikes = await Promise.all(
+        data.map(async (post) => {
+          const [likeCount, isLiked, commentCount] = await Promise.all([
+            postsService.getLikeCount(post.id),
+            postsService.isPostLiked(userId, post.id),
+            postsService.getCommentCount(post.id),
+          ]);
+          
+          return {
+            ...post,
+            like_count: likeCount,
+            is_liked: isLiked,
+            comment_count: commentCount,
+          };
+        })
+      );
+      
+      return postsWithLikes;
+    }
+    
+    return data || [];
+  },
+
   deletePost: async (postId: string) => {
     const { error } = await supabase
       .from('posts')
@@ -110,6 +171,9 @@ export const postsService = {
       .eq('id', postId);
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.POST_DELETED);
   },
 
   likePost: async (userId: string, postId: string) => {
@@ -158,7 +222,6 @@ export const postsService = {
     return count || 0;
   },
 
-  // NEW: Get comment count for a post
   getCommentCount: async (postId: string): Promise<number> => {
     const { count, error } = await supabase
       .from('comments')

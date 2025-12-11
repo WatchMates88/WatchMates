@@ -1,4 +1,7 @@
-import React from 'react';
+// src/components/media/PosterGrid.tsx
+// Optimized: Performance props + memoized renderItem
+
+import React, { useCallback } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { Movie, TVShow } from '../../types';
 import { PosterCard } from './PosterCard';
@@ -16,18 +19,36 @@ export const PosterGrid: React.FC<PosterGridProps> = ({
   onItemPress,
   ListHeaderComponent,
 }) => {
+  // Memoize renderItem to prevent recreation on every render
+  const renderItem = useCallback(
+    ({ item }: { item: Movie | TVShow }) => (
+      <PosterCard item={item} onPress={() => onItemPress(item)} />
+    ),
+    [onItemPress]
+  );
+
+  // Memoize keyExtractor
+  const keyExtractor = useCallback(
+    (item: Movie | TVShow) => item.id.toString(),
+    []
+  );
+
   return (
     <FlatList
       data={data}
       numColumns={GRID_COLUMNS}
-      renderItem={({ item }) => (
-        <PosterCard item={item} onPress={() => onItemPress(item)} />
-      )}
-      keyExtractor={(item) => item.id.toString()}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
       contentContainerStyle={styles.container}
       columnWrapperStyle={styles.row}
       ListHeaderComponent={ListHeaderComponent}
       showsVerticalScrollIndicator={false}
+      // Performance optimizations
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={12}
+      updateCellsBatchingPeriod={50}
+      initialNumToRender={12}
+      windowSize={7}
     />
   );
 };

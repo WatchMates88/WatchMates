@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -42,7 +42,7 @@ interface Props {
   isOwnPost: boolean;
 }
 
-export const FeedPost: React.FC<Props> = ({
+const FeedPostComponent: React.FC<Props> = ({
   post,
   onLike,
   onComment,
@@ -98,7 +98,7 @@ export const FeedPost: React.FC<Props> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onUserPress}>
+        <TouchableOpacity onPress={onUserPress} activeOpacity={0.7}>
           <Image
             source={{
               uri:
@@ -139,10 +139,12 @@ export const FeedPost: React.FC<Props> = ({
             contentContainerStyle={styles.imagesScroll}
             decelerationRate="fast"
             snapToInterval={IMAGE_WIDTH + 8}
+            removeClippedSubviews={true}
+            pagingEnabled={false}
           >
             {post.images.map((uri, idx) => (
               <TouchableOpacity
-                key={idx}
+                key={`${post.id}-image-${idx}`}
                 activeOpacity={0.95}
                 onPress={() => onImagePress(idx)}
               >
@@ -210,6 +212,20 @@ export const FeedPost: React.FC<Props> = ({
     </View>
   );
 };
+
+// ✅ MEMOIZE with custom comparison
+export const FeedPost = memo(FeedPostComponent, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.post.is_liked === nextProps.post.is_liked &&
+    prevProps.post.like_count === nextProps.post.like_count &&
+    prevProps.commentCount === nextProps.commentCount &&
+    prevProps.isOwnPost === nextProps.isOwnPost &&
+    prevProps.post.review_text === nextProps.post.review_text &&
+    prevProps.post.images?.length === nextProps.post.images?.length
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

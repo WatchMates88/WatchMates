@@ -1,6 +1,10 @@
+// src/screens/profile/ProfileScreen.tsx
+// Complete with Guest Mode UI
+
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { spacing, typography } from '../../theme';
 import { useAuthStore, usePostsStore, useFriendsStore } from '../../store';
@@ -26,13 +30,13 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (user && !user.isGuest) {
       loadProfileData();
     }
   }, [user]);
 
   const loadProfileData = async () => {
-    if (!user) return;
+    if (!user || user.isGuest) return;
 
     try {
       await Promise.all([
@@ -54,13 +58,12 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const uploadPhoto = async (uri: string) => {
-    if (!user) return;
+    if (!user || user.isGuest) return;
 
     try {
       setUploadingPhoto(true);
       await authService.uploadAvatar(user.id, uri);
       
-      // Refresh user profile to get new avatar URL
       const updatedProfile = await authService.getProfile(user.id);
       if (updatedProfile) {
         setUser(updatedProfile);
@@ -69,7 +72,7 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('Success', 'Profile picture updated!');
     } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Upload Failed', error.message || 'Failed to upload photo. Please try again.');
+      Alert.alert('Upload Failed', error.message || 'Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
     }
@@ -79,52 +82,48 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('Permission Needed', 'Please grant permissions in settings');
+      Alert.alert('Permission Needed', 'Please grant permissions');
       return;
     }
 
-    Alert.alert(
-      'Profile Picture',
-      'Choose a source',
-      [
-        {
-          text: 'Camera',
-          onPress: async () => {
-            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-            if (cameraStatus.status !== 'granted') {
-              Alert.alert('Permission Needed', 'Please grant camera permissions');
-              return;
-            }
-            
-            const result = await ImagePicker.launchCameraAsync({
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.7,
-            });
+    Alert.alert('Profile Picture', 'Choose a source', [
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+          if (cameraStatus.status !== 'granted') {
+            Alert.alert('Permission Needed', 'Camera permission needed');
+            return;
+          }
+          
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          });
 
-            if (!result.canceled) {
-              await uploadPhoto(result.assets[0].uri);
-            }
-          },
+          if (!result.canceled) {
+            await uploadPhoto(result.assets[0].uri);
+          }
         },
-        {
-          text: 'Gallery',
-          onPress: async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.7,
-            });
+      },
+      {
+        text: 'Gallery',
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+          });
 
-            if (!result.canceled) {
-              await uploadPhoto(result.assets[0].uri);
-            }
-          },
+          if (!result.canceled) {
+            await uploadPhoto(result.assets[0].uri);
+          }
         },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleUserPress = (profile: Profile) => {
@@ -215,6 +214,68 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  // GUEST MODE UI
+  if (user?.isGuest) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.guestContainer}>
+          <View style={styles.guestIcon}>
+            <Text style={styles.guestEmoji}>🎬</Text>
+          </View>
+          
+          <Text style={styles.guestTitle}>Create Your Account</Text>
+          <Text style={styles.guestSubtitle}>
+            Unlock all features and join the community
+          </Text>
+
+          <View style={styles.guestFeatures}>
+            <View style={styles.guestFeature}>
+              <Text style={styles.featureIcon}>📌</Text>
+              <Text style={styles.featureText}>Build your watchlist</Text>
+            </View>
+            <View style={styles.guestFeature}>
+              <Text style={styles.featureIcon}>✍️</Text>
+              <Text style={styles.featureText}>Write and share reviews</Text>
+            </View>
+            <View style={styles.guestFeature}>
+              <Text style={styles.featureIcon}>👥</Text>
+              <Text style={styles.featureText}>Follow friends</Text>
+            </View>
+            <View style={styles.guestFeature}>
+              <Text style={styles.featureIcon}>📁</Text>
+              <Text style={styles.featureText}>Create collections</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.guestSignupButton}
+            onPress={() => navigation?.navigate('Signup')}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#8B5CFF', '#A78BFA']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.guestGradientButton}
+            >
+              <Text style={styles.guestSignupText}>Create Free Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.guestLoginButton}
+            onPress={() => navigation?.navigate('Login')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.guestLoginText}>
+              Already have an account? <Text style={styles.guestLoginAccent}>Log in</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   if (!user) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -295,10 +356,9 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        style={{ backgroundColor: colors.background }}
-        contentContainerStyle={{ backgroundColor: colors.background, paddingBottom: spacing.xxl }}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
       >
-        <View style={[styles.content, { backgroundColor: colors.background }]}>
+        <View style={styles.content}>
           <View style={styles.avatarWrapper}>
             {uploadingPhoto ? (
               <View style={[styles.avatarLoading, { backgroundColor: colors.backgroundSecondary }]}>
@@ -380,9 +440,96 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
+  container: { flex: 1 },
+  
+  // GUEST MODE STYLES
+  guestContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
+  guestIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(139, 92, 255, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 255, 0.2)',
+  },
+  guestEmoji: { fontSize: 60 },
+  guestTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    letterSpacing: -1,
+  },
+  guestSubtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 24,
+  },
+  guestFeatures: {
+    width: '100%',
+    marginBottom: 40,
+    gap: 12,
+  },
+  guestFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  featureIcon: { fontSize: 22, marginRight: 14 },
+  featureText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  guestSignupButton: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#8B5CFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  guestGradientButton: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  guestSignupText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  guestLoginButton: { paddingVertical: 12 },
+  guestLoginText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  guestLoginAccent: {
+    color: '#A78BFA',
+    fontWeight: '700',
+  },
+  
+  // REGULAR PROFILE STYLES
   header: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -519,9 +666,7 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     flex: 1 
   },
-  postTime: { 
-    fontSize: typography.fontSize.xs,
-  },
+  postTime: { fontSize: typography.fontSize.xs },
   emptyPosts: { 
     alignItems: 'center', 
     paddingVertical: spacing.xxl, 
@@ -584,14 +729,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userInfo: { flex: 1, marginLeft: spacing.md },
-  userName: { 
-    fontSize: typography.fontSize.md, 
-    fontWeight: '600',
-  },
-  userUsername: { 
-    fontSize: typography.fontSize.sm, 
-    marginTop: 2 
-  },
+  userName: { fontSize: typography.fontSize.md, fontWeight: '600' },
+  userUsername: { fontSize: typography.fontSize.sm, marginTop: 2 },
   emptyUsers: { alignItems: 'center', paddingVertical: spacing.xxl },
   emptyUsersText: { fontSize: typography.fontSize.md },
 });

@@ -1,6 +1,11 @@
+// src/store/postsStore.ts
+// Complete with Guest UUID checks
+
 import { create } from 'zustand';
 import { Post } from '../types';
 import { postsService } from '../services/supabase/posts.service';
+
+const GUEST_UUID = '00000000-0000-0000-0000-000000000000';
 
 interface PostsState {
   posts: Post[];
@@ -18,7 +23,6 @@ interface PostsState {
   
   toggleLike: (postId: string, userId: string) => Promise<void>;
   
-  // NEW: Edit and delete functions
   editPost: (postId: string, reviewText: string, rating: number | null) => Promise<void>;
   deletePostById: (postId: string) => Promise<void>;
   
@@ -48,6 +52,12 @@ export const usePostsStore = create<PostsState>((set, get) => ({
   })),
   
   fetchFeed: async (userId: string, refresh = false) => {
+    // Skip for guest users
+    if (userId === GUEST_UUID) {
+      set({ posts: [], isLoading: false, hasMore: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       
@@ -64,18 +74,26 @@ export const usePostsStore = create<PostsState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error fetching feed:', error);
+      set({ posts: [] });
     } finally {
       set({ isLoading: false });
     }
   },
   
   fetchUserPosts: async (userId: string) => {
+    // Skip for guest users
+    if (userId === GUEST_UUID) {
+      set({ userPosts: [], isLoading: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       const posts = await postsService.getUserPosts(userId);
       set({ userPosts: posts });
     } catch (error) {
       console.error('Error fetching user posts:', error);
+      set({ userPosts: [] });
     } finally {
       set({ isLoading: false });
     }
@@ -103,7 +121,6 @@ export const usePostsStore = create<PostsState>((set, get) => ({
     }
   },
   
-  // NEW: Edit post
   editPost: async (postId: string, reviewText: string, rating: number | null) => {
     try {
       const updatedPost = await postsService.updatePost(postId, reviewText, rating);
@@ -119,7 +136,6 @@ export const usePostsStore = create<PostsState>((set, get) => ({
     }
   },
   
-  // NEW: Delete post
   deletePostById: async (postId: string) => {
     try {
       await postsService.deletePost(postId);

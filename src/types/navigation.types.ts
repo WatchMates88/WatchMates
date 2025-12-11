@@ -1,9 +1,10 @@
-// src/types/navigation.types.ts
-// Complete navigation types with TrailerPlayer
+// src/types/navigation.types.ts - COMPLETE FILE
+// Updated: Welcome added to TabParamList
 
 import { NavigatorScreenParams } from '@react-navigation/native';
 
 export type TabParamList = {
+  Welcome: undefined;
   Home: undefined;
   Search: undefined;
   Feed: undefined;
@@ -12,7 +13,7 @@ export type TabParamList = {
 };
 
 export type RootStackParamList = {
-  Welcome: undefined;
+  Splash: undefined;
   Login: undefined;
   Signup: undefined;
 
@@ -44,6 +45,12 @@ export type RootStackParamList = {
   TrailerPlayer: {
     videoKey: string;
     title?: string;
+  };
+
+  Reviews: {
+    mediaType: 'movie' | 'tv';
+    mediaId: number;
+    mediaTitle: string;
   };
 
   Settings: undefined;

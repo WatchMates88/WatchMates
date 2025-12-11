@@ -1,3 +1,6 @@
+// src/services/supabase/auth.service.ts
+// Complete with password reset functionality
+
 import { supabase } from './supabase.client';
 import { Profile } from '../../types';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -68,22 +71,37 @@ export const authService = {
     return data;
   },
 
+  // Send password reset email
+  resetPassword: async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://yourdomain.com/reset-password', // Change to your domain
+      // Or for mobile deep link: 'watchmates://reset-password'
+    });
+
+    if (error) throw error;
+  },
+
+  // Update password (for authenticated users or after reset)
+  updatePassword: async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw error;
+  },
+
   // Upload avatar using expo-file-system
   uploadAvatar: async (userId: string, imageUri: string): Promise<string> => {
     try {
-      // Get file extension
       const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
-      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to array buffer
       const arrayBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('avatars')
         .upload(fileName, arrayBuffer.buffer, {
@@ -93,14 +111,12 @@ export const authService = {
 
       if (error) throw error;
 
-      // Get public URL
       const { data: publicData } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
       const avatarUrl = publicData.publicUrl;
 
-      // Update profile
       await authService.updateProfile(userId, { avatar_url: avatarUrl });
 
       return avatarUrl;

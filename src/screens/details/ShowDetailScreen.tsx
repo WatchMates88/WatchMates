@@ -1,21 +1,28 @@
 // src/screens/details/ShowDetailScreen.tsx
-// Updated with trailer section (same as MovieDetail)
+// Complete: Trailer button + Reviews section
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Share, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Share, Alert, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { Play } from 'lucide-react-native';
 import { RootStackParamList } from '../../types';
 import { Button } from '../../components/common/Button';
 import { HorizontalScroll } from '../../components/media/HorizontalScroll';
 import { WatchProviders } from '../../components/media/WatchProviders';
-import { TrailerCard } from '../../components/media/TrailerCard';
+import { ReviewCard } from '../../components/reviews/ReviewCard';
 import { spacing } from '../../theme';
 import { tmdbService } from '../../services/tmdb/tmdb.service';
 import { watchlistService } from '../../services/supabase/watchlist.service';
+import { reviewService } from '../../services/review.service';
+import { postsService } from '../../services/supabase/posts.service';
 import { useAuthStore } from '../../store';
 import { useTheme } from '../../hooks/useTheme';
 import { streamingService, ProviderAvailability } from '../../services/justwatch/justwatch.service';
+import { UnifiedReview } from '../../types/review.types';
+import { useGuestCheck } from '../../hooks/useGuestCheck';
+import { SignupPromptModal } from '../../components/auth/SignupPromptModal';
+import { AddToListModal } from '../../components/media/AddToListModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShowDetail'>;
 
@@ -31,10 +38,21 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [watchlistItem, setWatchlistItem] = useState<any>(null);
   const [addingToWatchlist, setAddingToWatchlist] = useState(false);
   const [markingWatched, setMarkingWatched] = useState(false);
-  const [videos, setVideos] = useState<any[]>([]);
+  const [officialTrailer, setOfficialTrailer] = useState<any>(null);
+  
+  const [watchmatesReviews, setWatchmatesReviews] = useState<UnifiedReview[]>([]);
+  const [tmdbReviews, setTmdbReviews] = useState<UnifiedReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+
+  // Guest check hook
+  const { checkGuest, promptVisible, promptAction, closePrompt } = useGuestCheck();
+  
+  // Add to List modal state
+  const [showAddToListModal, setShowAddToListModal] = useState(false);
 
   useEffect(() => {
     loadShowDetails();
+    loadReviews();
   }, [showId]);
 
   const loadShowDetails = async () => {
@@ -52,14 +70,12 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setSimilar(similarShows.slice(0, 10));
       setProviders(jwProviders);
       
-      // Filter to only Trailers and Teasers
-      if (showVideos && showVideos.list && showVideos.list.length) {
-        const filtered = showVideos.list.filter((v: any) => 
-          v.type === 'Trailer' || v.type === 'Teaser'
+      // Get first official trailer
+      if (showVideos && showVideos.list && showVideos.list.length > 0) {
+        const trailer = showVideos.list.find((v: any) => 
+          (v.type === 'Trailer' || v.type === 'Teaser') && v.site === 'YouTube'
         );
-        setVideos(filtered);
-      } else {
-        setVideos([]);
+        setOfficialTrailer(trailer || null);
       }
 
       if (user) {
@@ -72,33 +88,79 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const loadReviews = async () => {
+    try {
+      setLoadingReviews(true);
+      const allReviews = await reviewService.getUnifiedReviews('tv', showId, user?.id);
+      
+      const watchmates = allReviews.filter(r => r.source === 'watchmates').slice(0, 3);
+      const allTmdb = allReviews.filter(r => r.source === 'tmdb');
+      
+      // Smart TMDB limiting based on WatchMates count
+      let tmdbCount = 0;
+      if (watchmates.length === 0) {
+        tmdbCount = 3; // Fill empty space
+      } else if (watchmates.length === 1) {
+        tmdbCount = 2; // Balance
+      } else if (watchmates.length === 2) {
+        tmdbCount = 1; // Supplement
+      }
+      // else: 3+ WatchMates = 0 TMDB
+      
+      const tmdb = allTmdb.slice(0, tmdbCount);
+      
+      setWatchmatesReviews(watchmates);
+      setTmdbReviews(tmdb);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const handleLikeReview = async (review: UnifiedReview) => {
+    if (!user || review.source !== 'watchmates' || !review.post) return;
+
+    try {
+      if (review.isLiked) {
+        await postsService.unlikePost(user.id, review.post.id);
+      } else {
+        await postsService.likePost(user.id, review.post.id);
+      }
+
+      setWatchmatesReviews((prev) =>
+        prev.map((r) =>
+          r.id === review.id
+            ? {
+                ...r,
+                isLiked: !r.isLiked,
+                likeCount: r.isLiked ? r.likeCount! - 1 : r.likeCount! + 1,
+              }
+            : r
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
   const handleAddToWatchlist = async () => {
+    // Check if guest
+    if (!checkGuest('save')) return;
+
     if (!user) {
       Alert.alert('Login Required', 'Please login to add to watchlist');
       return;
     }
 
-    try {
-      setAddingToWatchlist(true);
-      
-      if (watchlistItem) {
-        await watchlistService.removeFromWatchlist(watchlistItem.id);
-        setWatchlistItem(null);
-        Alert.alert('Success', 'Removed from watchlist');
-      } else {
-        const item = await watchlistService.addToWatchlist(user.id, showId, 'tv', 'to_watch');
-        setWatchlistItem(item);
-        Alert.alert('Success', 'Added to watchlist!');
-      }
-    } catch (error) {
-      console.error('Error updating watchlist:', error);
-      Alert.alert('Error', 'Failed to update watchlist');
-    } finally {
-      setAddingToWatchlist(false);
-    }
+    // Open Add to List modal
+    setShowAddToListModal(true);
   };
 
   const handleMarkWatched = async () => {
+    // Check if guest
+    if (!checkGuest('save')) return;
+
     if (!user) {
       Alert.alert('Login Required', 'Please login to mark as watched');
       return;
@@ -147,10 +209,20 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     navigation.push('ShowDetail', { showId: item.id });
   };
 
-  const handleOpenTrailer = (videoKey: string, videoTitle: string) => {
-    navigation.navigate('TrailerPlayer', {
-      videoKey,
-      title: videoTitle,
+  const handlePlayTrailer = () => {
+    if (officialTrailer) {
+      navigation.navigate('TrailerPlayer', {
+        videoKey: officialTrailer.key,
+        title: officialTrailer.name || show?.name || 'Trailer',
+      });
+    }
+  };
+
+  const handleSeeAllReviews = () => {
+    navigation.navigate('Reviews', {
+      mediaType: 'tv',
+      mediaId: showId,
+      mediaTitle: show?.name || '',
     });
   };
 
@@ -170,10 +242,12 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const seasons = show?.number_of_seasons ? `${show.number_of_seasons} Season${show.number_of_seasons > 1 ? 's' : ''}` : 'N/A';
   const isInWatchlist = !!watchlistItem;
   const isWatched = watchlistItem?.status === 'watched';
+  const totalReviews = watchmatesReviews.length + tmdbReviews.length;
+  const hasMoreReviews = totalReviews > 0;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Backdrop */}
+      {/* Backdrop with Trailer Button */}
       {show?.backdrop_path && (
         <View style={styles.backdropContainer}>
           <Image
@@ -181,6 +255,18 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             style={styles.backdrop}
           />
           <View style={styles.bottomGradient} />
+          
+          {/* Trailer Button Capsule */}
+          {officialTrailer && (
+            <TouchableOpacity 
+              style={styles.trailerButton}
+              onPress={handlePlayTrailer}
+              activeOpacity={0.8}
+            >
+              <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.trailerButtonText}>Trailer</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -238,36 +324,8 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* PREMIUM TRAILER SECTION */}
-        {videos && videos.length > 0 && (
-          <View style={styles.trailerSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trailers & Videos</Text>
-              <Text style={styles.sectionCount}>{videos.length}</Text>
-            </View>
-            
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.trailerScroll}
-              decelerationRate="fast"
-            >
-              {videos.map((video: any, index: number) => (
-                <TrailerCard
-                  key={video.key}
-                  videoKey={video.key}
-                  title={video.name}
-                  type={video.type}
-                  isOfficial={video.official}
-                  onPress={() => handleOpenTrailer(video.key, video.name)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
         {/* Streaming Providers */}
-        <WatchProviders providers={providers} mediaType="tv" tmdbId={showId} />
+        <WatchProviders providers={providers} mediaType="tv" tmdbId={show.id} />
 
         {/* Divider */}
         <View style={styles.divider} />
@@ -298,16 +356,63 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.buttonThird}>
               <Button 
                 title="Review"
-                onPress={() => navigation.navigate('CreatePost', {
-                  movieId: showId,
-                  mediaType: 'tv',
-                  title: show?.name || '',
-                  poster: show?.poster_path,
-                })}
+                onPress={() => {
+                  if (!checkGuest('review')) return;
+                  
+                  navigation.navigate('CreatePost', {
+                    movieId: showId,
+                    mediaType: 'tv',
+                    title: show?.name || '',
+                    poster: show?.poster_path,
+                  });
+                }}
                 variant="outline"
               />
             </View>
           </View>
+        </View>
+
+        {/* REVIEWS SECTION */}
+        <View style={styles.reviewsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Reviews</Text>
+            {hasMoreReviews && (
+              <TouchableOpacity onPress={handleSeeAllReviews}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {loadingReviews ? (
+            <View style={styles.reviewsLoading}>
+              <ActivityIndicator size="small" color="#A78BFA" />
+            </View>
+          ) : totalReviews === 0 ? (
+            <View style={styles.noReviews}>
+              <Ionicons name="chatbubble-outline" size={32} color="#6E6A80" />
+              <Text style={styles.noReviewsText}>No reviews yet</Text>
+              <Text style={styles.noReviewsSubtext}>Be the first to share your thoughts!</Text>
+            </View>
+          ) : (
+            <>
+              {watchmatesReviews.map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onLike={() => handleLikeReview(review)}
+                />
+              ))}
+
+              {tmdbReviews.length > 0 && (
+                <>
+                  {watchmatesReviews.length > 0 && <View style={styles.reviewsDivider} />}
+                  {tmdbReviews.map((review) => (
+                    <ReviewCard key={review.id} review={review} />
+                  ))}
+                </>
+              )}
+            </>
+          )}
         </View>
 
         {/* Cast */}
@@ -330,6 +435,26 @@ export const ShowDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         )}
       </View>
+
+      {/* Guest Signup Prompt Modal */}
+      <SignupPromptModal
+        visible={promptVisible}
+        onClose={closePrompt}
+        action={promptAction}
+      />
+
+      {/* Add to List Modal */}
+      <AddToListModal
+        visible={showAddToListModal}
+        onClose={() => {
+          setShowAddToListModal(false);
+          loadShowDetails(); // Refresh to update button state
+        }}
+        mediaId={showId}
+        mediaType="tv"
+        mediaTitle={show?.name || ''}
+        mediaPoster={show?.poster_path || null}
+      />
     </ScrollView>
   );
 };
@@ -353,6 +478,35 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: 'transparent',
   },
+  
+  // TRAILER BUTTON CAPSULE
+  trailerButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  trailerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+    letterSpacing: 0.3,
+  },
+  
   backButton: {
     position: 'absolute',
     top: 62,
@@ -437,11 +591,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: 10,
   },
-
-  // TRAILER SECTION (Same as MovieDetail)
-  trailerSection: {
-    marginTop: spacing.xl,
-  },
+  
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -454,16 +604,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F5F5FF',
   },
-  sectionCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  trailerScroll: {
-    paddingLeft: spacing.md,
-    paddingRight: spacing.md,
-  },
-
+  
   divider: {
     height: 1,
     marginTop: spacing.xl,
@@ -490,6 +631,40 @@ const styles = StyleSheet.create({
   },
   buttonRow: { flexDirection: 'row', gap: spacing.sm },
   buttonThird: { flex: 1 },
+  
+  // REVIEWS SECTION
+  reviewsSection: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  seeAllText: {
+    color: 'rgba(255, 255, 255, 0.65)', // Less bright
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reviewsLoading: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  noReviews: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  noReviewsText: {
+    color: '#F5F5FF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  noReviewsSubtext: {
+    color: '#6E6A80',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  reviewsDivider: {
+    height: 18,
+  },
+  
   errorContainer: {
     flex: 1,
     justifyContent: 'center',

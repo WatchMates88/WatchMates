@@ -1,7 +1,7 @@
 // src/screens/feed/FeedScreen.tsx
-// Updated with EmptyState and SkeletonLoader
+// Fully optimized with memoized callbacks and FlatList optimizations
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -50,24 +50,26 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const handleLike = async (postId: string) => {
+  // ✅ MEMOIZED: Prevents function recreation on every render
+  const handleLike = useCallback(async (postId: string) => {
     if (!user) return;
     await toggleLike(postId, user.id);
-  };
+  }, [user, toggleLike]);
 
-  const handleComment = (postId: string) => {
+  // ✅ MEMOIZED: Navigation callbacks
+  const handleComment = useCallback((postId: string) => {
     navigation.navigate('PostDetail', { postId });
-  };
+  }, [navigation]);
 
-  const handleUserPress = (userId: string) => {
+  const handleUserPress = useCallback((userId: string) => {
     if (userId === user?.id) {
       navigation.navigate('MainTabs', { screen: 'Profile' });
     } else {
       navigation.navigate('FriendProfile', { userId });
     }
-  };
+  }, [navigation, user?.id]);
 
-  const handleMediaPress = (post: Post) => {
+  const handleMediaPress = useCallback((post: Post) => {
     if (post.media_id && post.media_id > 0) {
       if (post.media_type === 'movie') {
         navigation.navigate('MovieDetail', { movieId: post.media_id });
@@ -75,18 +77,18 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
         navigation.navigate('ShowDetail', { showId: post.media_id });
       }
     }
-  };
+  }, [navigation]);
 
-  const handleImagePress = (post: Post, index: number) => {
+  const handleImagePress = useCallback((post: Post, index: number) => {
     if (post.images && post.images.length > 0) {
       navigation.navigate('FullScreenImageViewer', {
         images: post.images,
         index,
       });
     }
-  };
+  }, [navigation]);
 
-  const handlePostOptions = (post: Post) => {
+  const handlePostOptions = useCallback((post: Post) => {
     Alert.alert('Post Options', '', [
       {
         text: 'Edit',
@@ -125,7 +127,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  };
+  }, [navigation, deletePostById]);
 
   const handleSearch = async (text: string) => {
     setSearchQuery(text);
@@ -140,7 +142,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleSelectMedia = (item: Movie | TVShow) => {
+  const handleSelectMedia = useCallback((item: Movie | TVShow) => {
     const title = 'title' in item ? item.title : item.name;
     const mediaType = 'title' in item ? 'movie' : 'tv';
     navigation.navigate('CreatePost', {
@@ -151,22 +153,37 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
     });
     setSearchQuery('');
     setSearchResults([]);
-  };
+  }, [navigation]);
 
-  const handleCreatePost = () => {
+  const handleCreatePost = useCallback(() => {
     navigation.navigate('CreatePost', {
       movieId: 0,
       mediaType: 'movie',
       title: '',
       poster: null,
     });
-  };
+  }, [navigation]);
 
-  const handleFindFriends = () => {
+  const handleFindFriends = useCallback(() => {
     navigation.navigate('SearchUsers');
-  };
+  }, [navigation]);
 
-  const renderSearchResult = ({ item }: { item: Movie | TVShow }) => {
+  // ✅ MEMOIZED: Render functions
+  const renderPost = useCallback(({ item }: { item: Post }) => (
+    <FeedPost
+      post={item}
+      onLike={() => handleLike(item.id)}
+      onComment={() => handleComment(item.id)}
+      onUserPress={() => handleUserPress(item.user_id)}
+      onMediaPress={() => handleMediaPress(item)}
+      onImagePress={(index) => handleImagePress(item, index)}
+      onOptions={() => handlePostOptions(item)}
+      commentCount={item.comment_count || 0}
+      isOwnPost={item.user_id === user?.id}
+    />
+  ), [handleLike, handleComment, handleUserPress, handleMediaPress, handleImagePress, handlePostOptions, user?.id]);
+
+  const renderSearchResult = useCallback(({ item }: { item: Movie | TVShow }) => {
     const title = 'title' in item ? item.title : item.name;
     return (
       <TouchableOpacity style={styles.searchCard} onPress={() => handleSelectMedia(item)}>
@@ -187,7 +204,18 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
         <Ionicons name="add-circle" size={22} color="#A78BFA" />
       </TouchableOpacity>
     );
-  };
+  }, [handleSelectMedia]);
+
+  const renderEmptyState = useCallback(() => (
+    <EmptyState
+      type="feed"
+      onAction={handleFindFriends}
+    />
+  ), [handleFindFriends]);
+
+  // ✅ KEY EXTRACTOR: Prevents re-renders
+  const keyExtractor = useCallback((item: Post) => item.id, []);
+  const searchKeyExtractor = useCallback((item: Movie | TVShow) => item.id.toString(), []);
 
   if (!user) {
     return (
@@ -221,8 +249,12 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
         <FlatList
           data={searchResults}
           renderItem={renderSearchResult}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={searchKeyExtractor}
           contentContainerStyle={styles.searchList}
+          // ✅ PERFORMANCE OPTIMIZATIONS
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={21}
         />
       ) : (
         <>
@@ -231,22 +263,18 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
           ) : (
             <FlatList
               data={posts}
-              renderItem={({ item }) => (
-                <FeedPost
-                  post={item}
-                  onLike={() => handleLike(item.id)}
-                  onComment={() => handleComment(item.id)}
-                  onUserPress={() => handleUserPress(item.user_id)}
-                  onMediaPress={() => handleMediaPress(item)}
-                  onImagePress={(index) => handleImagePress(item, index)}
-                  onOptions={() => handlePostOptions(item)}
-                  commentCount={item.comment_count || 0}
-                  isOwnPost={item.user_id === user?.id}
-                />
-              )}
-              keyExtractor={(item) => item.id}
+              renderItem={renderPost}
+              keyExtractor={keyExtractor}
               contentContainerStyle={styles.feedList}
               showsVerticalScrollIndicator={false}
+              
+              // ✅ CRITICAL PERFORMANCE OPTIMIZATIONS
+              removeClippedSubviews={true}        // Unmount off-screen items
+              maxToRenderPerBatch={10}            // Render 10 items per batch
+              updateCellsBatchingPeriod={50}      // Update every 50ms
+              windowSize={21}                     // Keep 21 screens in memory
+              initialNumToRender={5}              // Render 5 items initially
+              
               refreshControl={
                 <RefreshControl 
                   refreshing={refreshing} 
@@ -255,12 +283,7 @@ export const FeedScreen: React.FC<Props> = ({ navigation }) => {
                   colors={['#A78BFA']} 
                 />
               }
-              ListEmptyComponent={
-                <EmptyState
-                  type="feed"
-                  onAction={handleFindFriends}
-                />
-              }
+              ListEmptyComponent={renderEmptyState}
             />
           )}
         </>

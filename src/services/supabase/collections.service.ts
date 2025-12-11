@@ -1,5 +1,9 @@
+// src/services/supabase/collections.service.ts
+// Complete file with event emissions
+
 import { supabase } from './supabase.client';
 import { Collection, CollectionItem } from '../../types';
+import { refreshEventService, RefreshEvents } from '../refreshEvent.service';
 
 export const collectionsService = {
   // Get user's collections
@@ -48,6 +52,10 @@ export const collectionsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event - All screens will refresh
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
+    
     return data;
   },
 
@@ -64,6 +72,10 @@ export const collectionsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
+    
     return data;
   },
 
@@ -75,6 +87,9 @@ export const collectionsService = {
       .eq('id', collectionId);
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
   },
 
   // Add item to collection
@@ -96,6 +111,10 @@ export const collectionsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
+    
     return data;
   },
 
@@ -107,6 +126,9 @@ export const collectionsService = {
       .eq('id', itemId);
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
   },
 
   // Get collection items
@@ -133,6 +155,10 @@ export const collectionsService = {
       .single();
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
+    
     return data;
   },
 
@@ -145,6 +171,9 @@ export const collectionsService = {
       .eq('user_id', userId);
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.COLLECTION_UPDATED);
   },
 
   // Get collaborators

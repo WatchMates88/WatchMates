@@ -1,23 +1,15 @@
+// src/services/supabase/watchlist.service.ts
+// Complete - NO created_at references, with event emissions
+
 import { supabase } from './supabase.client';
-import { WatchlistItem } from '../../types';
+import { refreshEventService, RefreshEvents } from '../refreshEvent.service';
 
 export const watchlistService = {
-  getWatchlist: async (userId: string): Promise<WatchlistItem[]> => {
-    const { data, error } = await supabase
-      .from('watchlist')
-      .select('*')
-      .eq('user_id', userId)
-      .order('added_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  },
-
   addToWatchlist: async (
     userId: string,
     mediaId: number,
     mediaType: 'movie' | 'tv',
-    status: 'to_watch' | 'watched' = 'to_watch'
+    status: 'to_watch' | 'watched'
   ) => {
     const { data, error } = await supabase
       .from('watchlist')
@@ -32,21 +24,10 @@ export const watchlistService = {
       .single();
     
     if (error) throw error;
-    return data;
-  },
-
-  updateStatus: async (itemId: string, status: 'to_watch' | 'watched') => {
-    const { data, error } = await supabase
-      .from('watchlist')
-      .update({
-        status,
-        watched_at: status === 'watched' ? new Date().toISOString() : null,
-      })
-      .eq('id', itemId)
-      .select()
-      .single();
     
-    if (error) throw error;
+    // 🔥 Emit event - All screens listening will refresh
+    refreshEventService.emit(RefreshEvents.WATCHLIST_UPDATED);
+    
     return data;
   },
 
@@ -57,13 +38,51 @@ export const watchlistService = {
       .eq('id', itemId);
     
     if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.WATCHLIST_UPDATED);
   },
 
-  isInWatchlist: async (
-    userId: string,
-    mediaId: number,
-    mediaType: 'movie' | 'tv'
-  ): Promise<WatchlistItem | null> => {
+  updateStatus: async (itemId: string, status: 'to_watch' | 'watched') => {
+    const { data, error } = await supabase
+      .from('watchlist')
+      .update({ 
+        status,
+        watched_at: status === 'watched' ? new Date().toISOString() : null,
+      })
+      .eq('id', itemId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // 🔥 Emit event
+    refreshEventService.emit(RefreshEvents.WATCHLIST_UPDATED);
+    
+    return data;
+  },
+
+  getWatchlist: async (userId: string) => {
+    // Skip query for guest users
+    if (userId === '00000000-0000-0000-0000-000000000000') {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('watchlist')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  isInWatchlist: async (userId: string, mediaId: number, mediaType: 'movie' | 'tv') => {
+    // Skip query for guest users
+    if (userId === '00000000-0000-0000-0000-000000000000') {
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('watchlist')
       .select('*')
